@@ -17,6 +17,8 @@ The database must:
 11. Support row-level authorization boundaries where practical.
 12. Remain portable PostgreSQL so Supabase can be replaced later.
 13. Remain implementable with ₹0 required cash expenditure for the SIH MVP.
+14. Support two primary frontend surfaces — the Flutter seller application and the Buyer Web Application — over one shared database and commerce domain.
+15. Support distinct B2C and B2B buyer workflows without duplicating core product, inventory, order or pricing state.
 
 ---
 
@@ -77,6 +79,136 @@ The LLM, STT model, vision model or pricing model must never directly mutate aut
 ---
 
 ---
+
+
+# 3. Buyer Platform Data Architecture
+
+The platform has **one shared commerce database** serving two primary frontend families:
+
+```mermaid
+flowchart LR
+    Seller["Flutter Seller App"]
+    Buyer["Buyer Web Application"]
+
+    subgraph BuyerModes["Buyer Experiences"]
+        B2C["B2C Buyer"]
+        B2B["B2B Buyer"]
+    end
+
+    API["Shared FastAPI Application"]
+    Domain["Shared Commerce Domain"]
+    DB[("PostgreSQL")]
+
+    Seller --> API
+    Buyer --> B2C
+    Buyer --> B2B
+    B2C --> API
+    B2B --> API
+    API --> Domain
+    Domain --> DB
+```
+
+## 3.1 B2C Data Boundary
+
+B2C uses shared platform data for:
+
+- catalog discovery;
+- localized product content;
+- artisan/craft stories;
+- product availability;
+- cart;
+- checkout;
+- orders;
+- fulfilment;
+- payment/earnings state.
+
+The Buyer Web Application does not create a second product or inventory record. It references the authoritative product/variant/inventory records owned by the seller domain.
+
+### B2C Persistence
+
+```text
+BuyerSession
+   ↓
+Cart
+   ↓
+CartItem → ProductVariant
+   ↓
+Order
+   ↓
+OrderItem → ProductVariant
+   ↓
+Fulfillment / PaymentRecord
+```
+
+## 3.2 B2B Data Boundary
+
+B2B uses the same buyer identity/customer model but follows a requirement-driven workflow:
+
+```text
+B2B Buyer
+   ↓
+BuyerRequirement
+   ↓
+BuyerRequirementItem
+   ↓
+MarketOpportunity
+   ↓
+MarketMatch + MatchFactors
+   ↓
+Quotation
+   ↓
+QuotationItem
+   ↓
+Order (future conversion)
+```
+
+B2B does **not** maintain a separate inventory system. Matching evaluates authoritative artisan/cluster capacity and inventory, while quotations remain separate from confirmed orders until a deterministic order-creation workflow exists.
+
+## 3.3 Shared Data Ownership
+
+| Data | Owner / authority |
+|---|---|
+| Product | Artisan |
+| ProductVariant | Artisan |
+| Inventory | Seller domain |
+| Catalog publication | Platform / channel representation |
+| Cart | Buyer |
+| B2C Order | Buyer + commerce domain |
+| B2B Requirement | B2B Buyer |
+| Market Match | Platform-generated opportunity |
+| Quotation | Responding artisan/cluster |
+| Payment/Earnings state | Commerce domain |
+| Craft provenance | Artisan / verified operator |
+| AI evidence | Platform audit/intelligence layer |
+
+## 3.4 Buyer Web Does Not Own Commerce State
+
+The web frontend is a presentation and interaction channel.
+
+It must never directly mutate:
+
+- inventory quantity;
+- reservation state;
+- order state;
+- payment state;
+- product ownership;
+- B2B quotation acceptance.
+
+Those actions go through the same authorized domain services used by the seller app.
+
+## 3.5 Buyer Identity Model
+
+`customers` represents buyer identity at the commerce layer.
+
+A customer may participate as:
+
+```text
+B2C
+B2B
+BOTH
+```
+
+The buyer website may expose different navigation/workflows based on customer capability, but the underlying account and authorization model remains shared.
 
 # 3. PostgreSQL Design Principles
 
@@ -256,7 +388,10 @@ Market Access
 Direct Digital Commerce
 ├── storefronts
 ├── storefront_sections
-└── share_links
+├── share_links
+├── carts
+├── cart_items
+└── buyer_sessions
 
 Reliability / Offline
 ├── sync_queue_items
@@ -1990,11 +2125,87 @@ CREATE TABLE payment_records (
 
 ---
 
+## 12.6 `buyer_sessions`
+
+```sql
+CREATE TABLE buyer_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID REFERENCES customers(id),
+    session_token_hash TEXT NOT NULL UNIQUE,
+    channel TEXT NOT NULL DEFAULT 'BUYER_WEB',
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_buyer_sessions_customer ON buyer_sessions(customer_id);
+CREATE INDEX idx_buyer_sessions_expiry ON buyer_sessions(expires_at);
+```
+
+Buyer sessions are web-channel authentication/session state. They do not replace the core user/customer identity model.
+
+## 12.7 `carts`
+
+```sql
+CREATE TABLE carts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID REFERENCES customers(id),
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    currency CHAR(3) NOT NULL DEFAULT 'INR',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_carts_customer_status ON carts(customer_id, status);
+```
+
+A guest cart may exist before account association where the frontend flow supports guest browsing/checkout.
+
+## 12.8 `cart_items`
+
+```sql
+CREATE TABLE cart_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cart_id UUID NOT NULL REFERENCES carts(id) ON DELETE CASCADE,
+    variant_id UUID NOT NULL REFERENCES product_variants(id),
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    unit_price_snapshot NUMERIC(12,2),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (cart_id, variant_id)
+);
+
+CREATE INDEX idx_cart_items_cart ON cart_items(cart_id);
+CREATE INDEX idx_cart_items_variant ON cart_items(variant_id);
+```
+
+Cart availability is revalidated against authoritative inventory during checkout. A cart item is **not** itself an inventory reservation.
+
 ### B2C Storefront & Social-Commerce Model
 
 The product requires year-round access to digital demand. The MVP can use a shareable storefront link without requiring a paid social API.
 
 #### Storefront Relationship
+
+### Buyer Web Relationship
+
+The Buyer Web Application consumes storefront/catalog data but remains a separate frontend from the seller app.
+
+```mermaid
+flowchart TB
+    Artisan["Artisan / Seller App"] --> Product["Product + Catalog"]
+    Product --> Storefront["Storefront / Published Catalog"]
+    Storefront --> BuyerWeb["Buyer Web"]
+
+    BuyerWeb --> Cart["Cart"]
+    BuyerWeb --> B2COrder["B2C Order"]
+    BuyerWeb --> B2BReq["B2B Requirement"]
+
+    Cart --> Product
+    B2COrder --> Product
+    B2BReq --> Match["Demand Matching"]
+```
+
 
 ```mermaid
 flowchart TB
@@ -3184,7 +3395,7 @@ Quotation acceptance rate
 Artisan independence progression
 ```
 
-## 55.1 Event Model
+## 17.1 Event Model
 
 The existing `audit_events`, `ai_jobs`, `notifications`, `orders`, `sync_queue_items` and assistance tables provide the event sources needed for the first metrics layer.
 
@@ -3880,6 +4091,22 @@ export.zip
 
 ### 30.1 Expanded Problem-Statement Traceability
 
+### 30.2 Frontend-to-Database Traceability
+
+| Frontend surface | Workflow | Primary database areas |
+|---|---|---|
+| Flutter Seller App | Create product | `artisan_profiles`, `products`, `product_variants`, `product_media`, `voice_interactions`, `ai_jobs` |
+| Flutter Seller App | Operate business | `inventory`, `orders`, `fulfillments`, `payment_records`, `earnings_ledger` |
+| Flutter Seller App | Assisted commerce | `assistance_sessions`, `assistance_session_actions`, `artisan_onboarding_progress` |
+| Buyer Web | B2C discovery | `catalog_entries`, `catalog_publications`, `storefronts`, `product_media`, `production_stories` |
+| Buyer Web | B2C cart/checkout | `customers`, `buyer_sessions`, `carts`, `cart_items`, `orders`, `order_items` |
+| Buyer Web | B2C tracking | `orders`, `fulfillments`, `fulfilment_events`, `payment_records` |
+| Buyer Web | B2B demand | `buyer_requirements`, `buyer_requirement_items` |
+| Buyer Web | B2B matching | `market_opportunities`, `market_matches`, `market_match_factors`, `cluster_capacity_snapshots` |
+| Buyer Web | B2B quotations | `quotations`, `quotation_items` |
+| Shared platform | Trust / governance | `verifications`, `audit_events`, `data_export_requests`, `data_deletion_requests` |
+
+
 | Problem / Requirement | Database support |
 |---|---|
 | Low digital literacy | voice interactions, guided confirmations, assistance sessions |
@@ -4121,6 +4348,26 @@ AI suggests wrong material
 ---
 
 # 34. MVP Database Scope
+
+### Buyer Web MVP Data
+
+The Buyer Web MVP requires:
+
+- `customers`;
+- `buyer_sessions`;
+- `carts`;
+- `cart_items`;
+- `storefronts`;
+- `storefront_sections`;
+- `share_links`;
+- `orders`;
+- `order_items`;
+- `buyer_requirements`;
+- `buyer_requirement_items`;
+- `market_opportunities`;
+- `market_matches`;
+- `quotations`;
+- `quotation_items`.
 
 ## Must Implement
 

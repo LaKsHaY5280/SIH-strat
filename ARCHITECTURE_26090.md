@@ -32,6 +32,8 @@ The system must:
 10. Scale from the SIH MVP toward larger institutional deployments without requiring a complete redesign.
 11. Keep the **required MVP cash spend at ₹0** by prioritizing local/open-source software and free service tiers.
 12. Avoid making paid APIs, paid telephony, paid SMS, paid GPU hosting or a commercial ONDC participant a mandatory MVP dependency.
+13. Treat the **Flutter seller application** and the **Buyer Web Application** as separate experience surfaces over one shared commerce platform.
+14. Support both **B2C buyer journeys** and **B2B buyer journeys** through the Buyer Web Application without duplicating domain logic or databases.
 
 ---
 
@@ -323,8 +325,11 @@ The phone-call interface is intentionally shown as a **future channel into the s
 ```mermaid
 flowchart TB
     subgraph Channels["Experience / Channel Layer"]
-        Mobile["Flutter Mobile App"]
+        Mobile["Flutter Seller App"]
         DidiUI["Didi / CRP Mode"]
+        BuyerWeb["Buyer Web Application"]
+        B2C["B2C Buyer Experience"]
+        B2B["B2B Buyer Experience"]
         Phone["Phone Call Interface - Future"]
     end
     subgraph API["Application Layer"]
@@ -364,6 +369,9 @@ flowchart TB
     end
     Mobile --> Gateway
     DidiUI --> Gateway
+    BuyerWeb --> Gateway
+    B2C --> BuyerWeb
+    B2B --> BuyerWeb
     Phone -. "Future" .-> Gateway
     Gateway --> Auth
     Gateway --> Product
@@ -510,6 +518,135 @@ Session ends / access expires
 Sensitive actions remain subject to artisan confirmation even when initiated by a CRP/Didi.
 
 ---
+
+
+## 7.4 Buyer Web Application — MVP
+
+The Buyer Web Application is the second primary product surface of the MVP. It is a web application for discovering artisan products and interacting with the platform as a buyer.
+
+It is **not** a second backend and does not own a second product/catalog/inventory database. It consumes the same application/API layer and deterministic domain services used by the Flutter seller application.
+
+### Buyer Web Responsibilities
+
+The Buyer Web Application supports two buyer experiences:
+
+| Experience | Primary users | Core capabilities |
+|---|---|---|
+| **B2C** | Individual consumers | Discover products, search/filter, view product and artisan stories, add to cart, place orders, view order status |
+| **B2B** | Institutional / bulk buyers | Create requirements, specify quantity/attributes/budget/deadline, discover matched artisan/cluster opportunities, request and receive quotations |
+
+### Shared Buyer Architecture
+
+```mermaid
+flowchart TB
+    BuyerWeb["Buyer Web Application"]
+    BuyerAuth["Buyer Authentication / Session"]
+    Discovery["Catalog Discovery"]
+    Cart["Cart / Checkout"]
+    Orders["Buyer Orders"]
+    B2BReq["B2B Requirement"]
+    Match["Demand Matching"]
+    Quote["Quotation"]
+    API["Application / API Layer"]
+    Domain["Shared Commerce Domain Services"]
+    DB[("PostgreSQL")]
+
+    BuyerWeb --> BuyerAuth
+    BuyerWeb --> Discovery
+    BuyerWeb --> Cart
+    BuyerWeb --> Orders
+    BuyerWeb --> B2BReq
+    BuyerWeb --> Match
+    BuyerWeb --> Quote
+
+    BuyerAuth --> API
+    Discovery --> API
+    Cart --> API
+    Orders --> API
+    B2BReq --> API
+    Match --> API
+    Quote --> API
+
+    API --> Domain
+    Domain --> DB
+```
+
+### B2C Buyer Flow
+
+```text
+Discover
+   ↓
+Search / Filter
+   ↓
+Product Detail
+   ↓
+Artisan / Craft Story
+   ↓
+Cart
+   ↓
+Checkout
+   ↓
+Order
+   ↓
+Fulfilment Tracking
+```
+
+### B2B Buyer Flow
+
+```text
+Create Requirement
+   ↓
+Specify craft / category / material
+   ↓
+Quantity + budget + deadline
+   ↓
+Demand Matching
+   ↓
+Ranked artisan / cluster opportunities
+   ↓
+Quotation Request / Response
+   ↓
+Quotation Review
+```
+
+The B2C and B2B experiences share:
+
+- product and catalog data;
+- artisan/craft provenance data;
+- inventory availability;
+- order services;
+- identity and authorization;
+- notification infrastructure;
+- shared database;
+- shared audit and analytics.
+
+They differ primarily in **buyer workflow**, not in the underlying commerce system.
+
+## 7.5 Experience-Surface Boundary
+
+```text
+                  SHARED PLATFORM
+                         │
+             ┌───────────┴───────────┐
+             │                       │
+      SELLER EXPERIENCE        BUYER EXPERIENCE
+             │                       │
+      Flutter Seller App       Buyer Web Application
+             │                       │
+      ┌──────┴──────┐         ┌──────┴──────┐
+      │             │         │             │
+   Artisan       Didi     B2C Buyer     B2B Buyer
+```
+
+The architecture intentionally avoids:
+
+- a separate B2C database;
+- a separate B2B database;
+- a duplicated inventory service;
+- a duplicated order service;
+- a second backend for the Buyer Website.
+
+The Buyer Web Application is therefore a **first-class channel**, while the commerce domain remains shared.
 
 # 8. Backend Architecture
 
@@ -1871,8 +2008,9 @@ No paid CI service is required for MVP.
 
 | Layer | ₹0 MVP Primary | Alternatives | Why Primary |
 |---|---|---|---|
-| Mobile | Flutter | React Native, KMP, native | Cross-platform |
-| Language | Dart | TypeScript/Kotlin | Flutter ecosystem |
+| Seller Mobile | Flutter | React Native, KMP, native | Cross-platform artisan experience |
+| Buyer Web | Next.js / React | Remix, Nuxt | Fast web storefront + B2C/B2B buyer workflows |
+| Mobile Language | Dart | TypeScript/Kotlin | Flutter ecosystem |
 | State | Riverpod | Bloc, Provider | Explicit dependency/state |
 | Local DB | SQLite + Drift | Isar, Hive | Relational offline model |
 | Backend | FastAPI/Python | NestJS, Go, Spring | AI/ML interoperability |
@@ -1982,7 +2120,8 @@ A paid service can be added only after an explicit budget decision.
 - full B2B fulfilment coordination;
 - heritage visual search;
 - advanced marketplace ranking infrastructure;
-- production-scale managed AI inference.
+- production-scale managed AI inference;
+- separate B2C/B2B backend or database.
 
 ---
 
