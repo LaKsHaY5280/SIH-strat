@@ -2,11 +2,15 @@
 
 ## PS 26090 — AI Business Manager for Marginalized Artisans
 
-> **Purpose:** Define the technical architecture for the solution described in `SOLUTION_26090.md`.
+> **Purpose:** *Define the technical architecture for the solution described in `SOLUTION_26090.md`.*
+
 >
-> **Status:** Architecture baseline / v3 — **₹0 cash-cost SIH MVP**
+
+> **Status:** *Architecture baseline / v4 —* **₹0 cash-cost SIH MVP**
+
 >
-> **Architecture principle:** Keep the artisan experience extremely simple while keeping the internal system modular, auditable, replaceable and scalable.
+
+> **Architecture principle:** *Keep the artisan experience extremely simple while keeping the internal system modular, auditable, replaceable and scalable.*
 
 ---
 
@@ -52,7 +56,7 @@ This does **not** claim that production deployment at scale is permanently free.
 
 It means:
 
-> **No component is allowed to become a mandatory paid dependency for the SIH MVP.**
+>  **No component is allowed to become a mandatory paid dependency for the SIH MVP.**
 
 Supabase currently provides a $0 Free plan with 500 MB database size, 1 GB file storage and 50,000 monthly active users; free projects may pause after one week of inactivity. urlSupabase pricinghttps://supabase.com/pricing
 
@@ -90,27 +94,26 @@ Those are **post-MVP deployment concerns**, not required MVP spend.
 LLMs, speech models and vision models interpret input, extract attributes, generate drafts and recommend actions.
 
 They do **not** own authoritative state.
-
 ```text
 Artisan says:
 "Is saree ka daam 200 rupaye kam kar do"
-        |
-        v
+        |
+        v
 Voice / Intent Layer
-        |
-        v
+        |
+        v
 Action Proposal
-        |
-        v
+        |
+        v
 Permission Check
-        |
-        v
+        |
+        v
 Confirmation
-        |
-        v
+        |
+        v
 Deterministic Domain Service
-        |
-        v
+        |
+        v
 PostgreSQL
 ```
 
@@ -162,14 +165,13 @@ Offline operation supports:
 
 Offline operation does **not** imply that live inventory or order state can be authoritative without synchronization.
 
-> **Offline product creation ≠ offline real-time commerce.**
+>  **Offline product creation ≠ offline real-time commerce.**
 
 ---
 
 ## 3.5 Core business logic is channel-independent
 
 The following all use the same domain services:
-
 ```text
 Mobile App
 Didi / CRP Mode
@@ -186,7 +188,6 @@ No second business-logic implementation is created for the phone interface.
 AI, speech, translation and marketplace integrations use adapter interfaces.
 
 Application code should depend on:
-
 ```text
 SpeechProvider
 LLMProvider
@@ -205,7 +206,7 @@ not directly on one vendor SDK.
 
 The SIH implementation starts as:
 
-> **Modular monolith + asynchronous workers**
+>  **Modular monolith + asynchronous workers**
 
 rather than a fleet of microservices.
 
@@ -222,14 +223,13 @@ Identity, role boundaries, cluster ownership, auditability, media access and AI-
 ## 3.9 ₹0-first technology selection
 
 The preferred implementation is:
-
 ```text
 Local / Open Source
-        ↓
+        ↓
 Free Managed Service
-        ↓
+        ↓
 Free-Tier Cloud Provider
-        ↓
+        ↓
 Paid Provider
 ```
 
@@ -240,31 +240,27 @@ A paid provider may exist as an optional adapter, but the MVP cannot depend on i
 # 4. Product Architecture vs Technical Architecture
 
 The Solution document defines the product as five layers:
-
 ```text
 CREATE → PREPARE → SELL → OPERATE
-
-                ↘
-
-             ASSIST
-        across all layers
+                ↘
+             ASSIST
+        across all layers
 ```
 
 These are **product capabilities**, not deployment boundaries.
 
 The technical architecture is separate:
-
 ```text
 Experience / Channel Layer
-          ↓
+          ↓
 Application / API Layer
-          ↓
+          ↓
 Domain Services
-          ↓
+          ↓
 AI & Intelligence Layer
-          ↓
+          ↓
 Integration Layer
-          ↓
+          ↓
 Data & Infrastructure Layer
 ```
 
@@ -290,39 +286,33 @@ This separation prevents a product concept such as `Market Access Engine` from b
 | Notification Providers | Push/SMS/other future communications |
 
 ## 5.2 System Context Diagram
-
 ```mermaid
 flowchart TB
-    Artisan["Artisan"]
-    Didi["CRP / Didi"]
-    Buyer["B2C Buyer"]
-    B2B["B2B Buyer"]
-    Admin["Institution / Platform Admin"]
-
-    Mobile["Flutter Mobile App"]
-    FuturePhone["Future Phone-Call Interface"]
-    Platform["AI Artisan Commerce Platform"]
-
-    ONDC["ONDC / Seller Network Participant"]
-    Gov["Government Procurement"]
-    Social["Shareable / Social Commerce"]
-    AI["AI Providers / Local Models"]
-    Notify["Notification Layer"]
-
-    Artisan --> Mobile
-    Didi --> Mobile
-    Buyer --> Social
-    B2B --> Platform
-    Admin --> Platform
-
-    Mobile --> Platform
-    FuturePhone -. "Phase 3" .-> Platform
-
-    Platform --> ONDC
-    Platform --> Gov
-    Platform --> Social
-    Platform --> AI
-    Platform --> Notify
+    Artisan["Artisan"]
+    Didi["CRP / Didi"]
+    Buyer["B2C Buyer"]
+    B2B["B2B Buyer"]
+    Admin["Institution / Platform Admin"]
+    Mobile["Flutter Mobile App"]
+    FuturePhone["Future Phone-Call Interface"]
+    Platform["AI Artisan Commerce Platform"]
+    ONDC["ONDC / Seller Network Participant"]
+    Gov["Government Procurement"]
+    Social["Shareable / Social Commerce"]
+    AI["AI Providers / Local Models"]
+    Notify["Notification Layer"]
+    Artisan --> Mobile
+    Didi --> Mobile
+    Buyer --> Social
+    B2B --> Platform
+    Admin --> Platform
+    Mobile --> Platform
+    FuturePhone -. "Phase 3" .-> Platform
+    Platform --> ONDC
+    Platform --> Gov
+    Platform --> Social
+    Platform --> AI
+    Platform --> Notify
 ```
 
 The phone-call interface is intentionally shown as a **future channel into the same platform**, not as a separate product.
@@ -330,100 +320,86 @@ The phone-call interface is intentionally shown as a **future channel into the s
 ---
 
 # 6. High-Level Logical Architecture
-
 ```mermaid
 flowchart TB
-    subgraph Channels["Experience / Channel Layer"]
-        Mobile["Flutter Mobile App"]
-        DidiUI["Didi / CRP Mode"]
-        Phone["Phone Call Interface - Future"]
-    end
-
-    subgraph API["Application Layer"]
-        Gateway["API / Application Gateway"]
-        Auth["Authentication + Authorization"]
-    end
-
-    subgraph Domain["Domain Services"]
-        Product["Product & Catalog"]
-        Inventory["Inventory"]
-        Orders["Orders & Fulfilment"]
-        Payments["Payment State / Earnings"]
-        Market["Market Access"]
-        Assist["Assistance & Onboarding"]
-        Verification["Verification & Readiness"]
-    end
-
-    subgraph AI["Intelligence Layer"]
-        Voice["Voice Orchestrator"]
-        Vision["Image / Vision Pipeline"]
-        CatalogAI["Catalog Generation"]
-        Pricing["Price Advisor"]
-        Matching["Demand Matching"]
-        AIGateway["AI Gateway"]
-    end
-
-    subgraph Integrations["Integration Layer"]
-        ONDC["ONDC Adapter"]
-        Gov["Government / GeM Adapter"]
-        Social["Shareable Storefront"]
-        Notify["Notification Adapter"]
-        MarketData["Market Data Provider"]
-    end
-
-    subgraph Data["Data + Storage"]
-        DB[("PostgreSQL")]
-        Files[("Object Storage")]
-        Local["Device Local DB / Sync Queue"]
-        Queue["Async Job Queue"]
-        Audit["Audit Logs"]
-    end
-
-    Mobile --> Gateway
-    DidiUI --> Gateway
-    Phone -. "Future" .-> Gateway
-
-    Gateway --> Auth
-    Gateway --> Product
-    Gateway --> Inventory
-    Gateway --> Orders
-    Gateway --> Payments
-    Gateway --> Market
-    Gateway --> Assist
-    Gateway --> Verification
-
-    Product --> CatalogAI
-    Product --> Vision
-    CatalogAI --> Voice
-
-    Voice --> AIGateway
-    Vision --> AIGateway
-    CatalogAI --> AIGateway
-    Pricing --> AIGateway
-    Matching --> AIGateway
-
-    Pricing --> MarketData
-    Matching --> MarketData
-    Market --> ONDC
-    Market --> Gov
-    Market --> Social
-    Orders --> Notify
-
-    Product --> DB
-    Inventory --> DB
-    Orders --> DB
-    Payments --> DB
-    Assist --> DB
-    Verification --> DB
-    Audit --> DB
-
-    Product --> Files
-    Vision --> Queue
-    CatalogAI --> Queue
-    Orders --> Queue
-
-    Mobile <--> Local
-    Local <--> DB
+    subgraph Channels["Experience / Channel Layer"]
+        Mobile["Flutter Mobile App"]
+        DidiUI["Didi / CRP Mode"]
+        Phone["Phone Call Interface - Future"]
+    end
+    subgraph API["Application Layer"]
+        Gateway["API / Application Gateway"]
+        Auth["Authentication + Authorization"]
+    end
+    subgraph Domain["Domain Services"]
+        Product["Product & Catalog"]
+        Inventory["Inventory"]
+        Orders["Orders & Fulfilment"]
+        Payments["Payment State / Earnings"]
+        Market["Market Access"]
+        Assist["Assistance & Onboarding"]
+        Verification["Verification & Readiness"]
+    end
+    subgraph AI["Intelligence Layer"]
+        Voice["Voice Orchestrator"]
+        Vision["Image / Vision Pipeline"]
+        CatalogAI["Catalog Generation"]
+        Pricing["Price Advisor"]
+        Matching["Demand Matching"]
+        AIGateway["AI Gateway"]
+    end
+    subgraph Integrations["Integration Layer"]
+        ONDC["ONDC Adapter"]
+        Gov["Government / GeM Adapter"]
+        Social["Shareable Storefront"]
+        Notify["Notification Adapter"]
+        MarketData["Market Data Provider"]
+    end
+    subgraph Data["Data + Storage"]
+        DB[("PostgreSQL")]
+        Files[("Object Storage")]
+        Local["Device Local DB / Sync Queue"]
+        Queue["Async Job Queue"]
+        Audit["Audit Logs"]
+    end
+    Mobile --> Gateway
+    DidiUI --> Gateway
+    Phone -. "Future" .-> Gateway
+    Gateway --> Auth
+    Gateway --> Product
+    Gateway --> Inventory
+    Gateway --> Orders
+    Gateway --> Payments
+    Gateway --> Market
+    Gateway --> Assist
+    Gateway --> Verification
+    Product --> CatalogAI
+    Product --> Vision
+    CatalogAI --> Voice
+    Voice --> AIGateway
+    Vision --> AIGateway
+    CatalogAI --> AIGateway
+    Pricing --> AIGateway
+    Matching --> AIGateway
+    Pricing --> MarketData
+    Matching --> MarketData
+    Market --> ONDC
+    Market --> Gov
+    Market --> Social
+    Orders --> Notify
+    Product --> DB
+    Inventory --> DB
+    Orders --> DB
+    Payments --> DB
+    Assist --> DB
+    Verification --> DB
+    Audit --> DB
+    Product --> Files
+    Vision --> Queue
+    CatalogAI --> Queue
+    Orders --> Queue
+    Mobile <--> Local
+    Local <--> DB
 ```
 
 ---
@@ -449,7 +425,7 @@ Responsibilities:
 
 ### Primary technology
 
-**Flutter / Dart**
+Flutter / Dart
 
 Alternatives:
 
@@ -468,18 +444,17 @@ Flutter provides a single Android/iOS codebase and is well suited to rapid UI it
 The phone-call interface is **not part of the SIH MVP**.
 
 Future architecture:
-
 ```text
 Phone Call
-    ↓
+    ↓
 Telephony / Voice Gateway
-    ↓
+    ↓
 Voice Orchestrator
-    ↓
+    ↓
 Intent + Confirmation
-    ↓
+    ↓
 Core Domain Services
-    ↓
+    ↓
 PostgreSQL
 ```
 
@@ -489,7 +464,9 @@ It must never create a second product/order business-logic stack.
 
 ## 7.3 Didi / CRP Mode
 
-Didi mode is a role within the same application ecosystem.
+Didi mode is a role within the same application ecosystem and an **assisted-commerce channel** for artisans who need human support.
+
+The artisan remains the business/data owner. A CRP/Didi acts as an **authorized assisted operator**, not as a replacement owner account.
 
 Capabilities:
 
@@ -498,7 +475,39 @@ Capabilities:
 - correcting/escalating AI-generated information;
 - viewing assigned artisans;
 - tracking onboarding progress;
-- helping recover failed/sync-blocked work.
+- helping recover failed/sync-blocked work;
+- initiating a scoped assistance session with an artisan;
+- explaining or reviewing conflicts, readiness requirements and AI suggestions.
+
+### Assistance Session Model
+
+Every assisted interaction should be represented by an `AssistanceSession` with:
+
+- artisan ID;
+- CRP/Didi user ID;
+- organization/cluster scope;
+- session start/end timestamps;
+- granted assistance scope;
+- consent/confirmation state where required;
+- actions performed during the session;
+- audit correlation ID.
+
+Session lifecycle:
+```text
+Artisan
+   ↓
+Start Assistance Session
+   ↓
+Scoped CRP/Didi access
+   ↓
+Shared domain services
+   ↓
+All actions tagged with actor + session
+   ↓
+Session ends / access expires
+```
+
+Sensitive actions remain subject to artisan confirmation even when initiated by a CRP/Didi.
 
 ---
 
@@ -509,44 +518,38 @@ Capabilities:
 Use:
 
 > **FastAPI + Python modular monolith + asynchronous workers**
-
 ```mermaid
 flowchart TB
-    API["FastAPI Application"]
-
-    Product["Product Module"]
-    Catalog["Catalog Module"]
-    Inventory["Inventory Module"]
-    Orders["Order Module"]
-    Market["Market Module"]
-    Assist["Assist Module"]
-    Pricing["Pricing Module"]
-    Auth["Auth / RBAC"]
-    AI["AI Gateway"]
-
-    DB[("PostgreSQL")]
-    Queue["PostgreSQL Job Queue"]
-
-    API --> Product
-    API --> Catalog
-    API --> Inventory
-    API --> Orders
-    API --> Market
-    API --> Assist
-    API --> Pricing
-    API --> Auth
-    API --> AI
-
-    Product --> DB
-    Catalog --> DB
-    Inventory --> DB
-    Orders --> DB
-    Market --> DB
-    Assist --> DB
-    Pricing --> DB
-    Auth --> DB
-
-    API --> Queue
+    API["FastAPI Application"]
+    Product["Product Module"]
+    Catalog["Catalog Module"]
+    Inventory["Inventory Module"]
+    Orders["Order Module"]
+    Market["Market Module"]
+    Assist["Assist Module"]
+    Pricing["Pricing Module"]
+    Auth["Auth / RBAC"]
+    AI["AI Gateway"]
+    DB[("PostgreSQL")]
+    Queue["PostgreSQL Job Queue"]
+    API --> Product
+    API --> Catalog
+    API --> Inventory
+    API --> Orders
+    API --> Market
+    API --> Assist
+    API --> Pricing
+    API --> Auth
+    API --> AI
+    Product --> DB
+    Catalog --> DB
+    Inventory --> DB
+    Orders --> DB
+    Market --> DB
+    Assist --> DB
+    Pricing --> DB
+    Auth --> DB
+    API --> Queue
 ```
 
 ### Why not microservices?
@@ -582,7 +585,7 @@ The domain boundaries remain explicit so modules can later be extracted.
 
 ### Recommended
 
-**PostgreSQL through Supabase Free**
+PostgreSQL through Supabase Free
 
 Supabase is the managed platform around PostgreSQL for the MVP/development environment.
 
@@ -606,7 +609,6 @@ The application remains PostgreSQL-compatible if Supabase is replaced later.
 ---
 
 ## 9.2 Core Entities
-
 ```text
 User
 Role
@@ -615,29 +617,24 @@ Cluster
 ArtisanProfile
 AssistanceSession
 Verification
-
 Product
 ProductVariant
 ProductMedia
 ProductionStory
 CatalogEntry
-
 Inventory
 InventoryReservation
 InventoryMovement
-
 Customer
 Order
 OrderItem
 Fulfillment
 PaymentRecord
-
 PriceRecommendation
 MarketComparable
 BuyerRequirement
 Quotation
 MarketReadiness
-
 VoiceInteraction
 AIJob
 SyncQueueItem
@@ -647,37 +644,29 @@ AuditEvent
 ---
 
 ## 9.3 Core Relationships
-
 ```mermaid
 erDiagram
-    USER ||--o| ARTISAN_PROFILE : has
-    USER }o--o{ ROLE : receives
-
-    ORGANIZATION ||--o{ CLUSTER : manages
-    CLUSTER ||--o{ ARTISAN_PROFILE : contains
-
-    ARTISAN_PROFILE ||--o{ PRODUCT : owns
-    PRODUCT ||--o{ PRODUCT_VARIANT : has
-    PRODUCT ||--o{ PRODUCT_MEDIA : has
-    PRODUCT ||--o{ PRODUCTION_STORY : has
-
-    PRODUCT_VARIANT ||--o{ INVENTORY : tracks
-    PRODUCT_VARIANT ||--o{ INVENTORY_RESERVATION : reserves
-
-    CUSTOMER ||--o{ ORDER : places
-    ORDER ||--o{ ORDER_ITEM : contains
-    PRODUCT_VARIANT ||--o{ ORDER_ITEM : sold_as
-    ORDER ||--o| FULFILLMENT : has
-    ORDER ||--o{ PAYMENT_RECORD : has
-
-    PRODUCT ||--o{ PRICE_RECOMMENDATION : receives
-    BUYER_REQUIREMENT ||--o{ QUOTATION : receives
-    CLUSTER ||--o{ QUOTATION : responds_to
-
-    ARTISAN_PROFILE ||--o{ ASSISTANCE_SESSION : receives
-    USER ||--o{ ASSISTANCE_SESSION : participates
-
-    USER ||--o{ AUDIT_EVENT : generates
+    USER ||--o| ARTISAN_PROFILE : has
+    USER }o--o{ ROLE : receives
+    ORGANIZATION ||--o{ CLUSTER : manages
+    CLUSTER ||--o{ ARTISAN_PROFILE : contains
+    ARTISAN_PROFILE ||--o{ PRODUCT : owns
+    PRODUCT ||--o{ PRODUCT_VARIANT : has
+    PRODUCT ||--o{ PRODUCT_MEDIA : has
+    PRODUCT ||--o{ PRODUCTION_STORY : has
+    PRODUCT_VARIANT ||--o{ INVENTORY : tracks
+    PRODUCT_VARIANT ||--o{ INVENTORY_RESERVATION : reserves
+    CUSTOMER ||--o{ ORDER : places
+    ORDER ||--o{ ORDER_ITEM : contains
+    PRODUCT_VARIANT ||--o{ ORDER_ITEM : sold_as
+    ORDER ||--o| FULFILLMENT : has
+    ORDER ||--o{ PAYMENT_RECORD : has
+    PRODUCT ||--o{ PRICE_RECOMMENDATION : receives
+    BUYER_REQUIREMENT ||--o{ QUOTATION : receives
+    CLUSTER ||--o{ QUOTATION : responds_to
+    ARTISAN_PROFILE ||--o{ ASSISTANCE_SESSION : receives
+    USER ||--o{ ASSISTANCE_SESSION : participates
+    USER ||--o{ AUDIT_EVENT : generates
 ```
 
 ---
@@ -702,41 +691,38 @@ This supports:
 - configurable variants.
 
 Example relational schema:
-
 ```sql
 CREATE TABLE products (
-    id UUID PRIMARY KEY,
-    artisan_id UUID NOT NULL,
-    title TEXT NOT NULL,
-    description TEXT,
-    craft_type TEXT,
-    material TEXT,
-    status TEXT NOT NULL,
-    version BIGINT NOT NULL DEFAULT 1,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    id UUID PRIMARY KEY,
+    artisan_id UUID NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    craft_type TEXT,
+    material TEXT,
+    status TEXT NOT NULL,
+    version BIGINT NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
 CREATE TABLE product_variants (
-    id UUID PRIMARY KEY,
-    product_id UUID NOT NULL REFERENCES products(id),
-    sku TEXT UNIQUE,
-    size TEXT,
-    color TEXT,
-    design TEXT,
-    unit_price NUMERIC(12,2),
-    quantity_available INTEGER NOT NULL DEFAULT 0,
-    is_available BOOLEAN NOT NULL DEFAULT true,
-    version BIGINT NOT NULL DEFAULT 1
+    id UUID PRIMARY KEY,
+    product_id UUID NOT NULL REFERENCES products(id),
+    sku TEXT UNIQUE,
+    size TEXT,
+    color TEXT,
+    design TEXT,
+    unit_price NUMERIC(12,2),
+    quantity_available INTEGER NOT NULL DEFAULT 0,
+    is_available BOOLEAN NOT NULL DEFAULT true,
+    version BIGINT NOT NULL DEFAULT 1
 );
-
 CREATE TABLE inventory_reservations (
-    id UUID PRIMARY KEY,
-    variant_id UUID NOT NULL REFERENCES product_variants(id),
-    order_id UUID,
-    quantity INTEGER NOT NULL,
-    status TEXT NOT NULL,
-    expires_at TIMESTAMPTZ
+    id UUID PRIMARY KEY,
+    variant_id UUID NOT NULL REFERENCES product_variants(id),
+    order_id UUID,
+    quantity INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    expires_at TIMESTAMPTZ
 );
 ```
 
@@ -745,18 +731,17 @@ CREATE TABLE inventory_reservations (
 ## 9.5 Production Stories
 
 Production stories are separate from the product row.
-
 ```sql
 CREATE TABLE production_stories (
-    id UUID PRIMARY KEY,
-    artisan_id UUID NOT NULL,
-    product_id UUID NOT NULL REFERENCES products(id),
-    language_code TEXT NOT NULL,
-    text TEXT,
-    audio_object_key TEXT,
-    duration_seconds INTEGER,
-    is_public BOOLEAN NOT NULL DEFAULT false,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    id UUID PRIMARY KEY,
+    artisan_id UUID NOT NULL,
+    product_id UUID NOT NULL REFERENCES products(id),
+    language_code TEXT NOT NULL,
+    text TEXT,
+    audio_object_key TEXT,
+    duration_seconds INTEGER,
+    is_public BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
 
@@ -789,21 +774,22 @@ Retention of original audio must be governed by privacy/retention rules.
 
 ### Primary
 
-**Phone number + PIN + device binding**
+Phone number + PIN + device binding
 
 Flow:
-
 ```text
 Invite / Sign-up
-      ↓
+      ↓
 Phone number
-      ↓
+      ↓
 Set PIN
-      ↓
+      ↓
 Device binding
-      ↓
+      ↓
 Authenticated session
 ```
+
+Device binding records a trusted device registration for the account and helps prevent silent use of copied credentials on another device. It is not a cryptographic guarantee against account sharing or a replacement for server-side authorization. A recovery/rebinding process must therefore exist for a lost or replaced device and must be audit logged.
 
 Device biometrics may be used as a local unlock convenience where supported.
 
@@ -829,31 +815,41 @@ The ₹0 MVP does not require biometrics because availability and device capabil
 
 Use:
 
-> **RBAC + resource ownership + organization/cluster scope + server-side authorization**
+>  **RBAC + resource ownership + organization/cluster scope + assistance-session scope + server-side authorization**
 
 Example:
-
 ```text
 Artisan A
-    ↓
+    ↓
 Can read/write products owned by Artisan A
-
 Didi X
-    ↓
+    ↓
 Can assist only artisans assigned to Didi X
-
+    ↓
+Access is scoped to an active AssistanceSession
 Institution Y
-    ↓
+    ↓
 Can see only clusters belonging to Institution Y
-
 Platform Admin
-    ↓
+    ↓
 Privileged operational access + mandatory audit log
 ```
 
-Sensitive actions require artisan confirmation.
+Additional controls:
 
-RLS should protect data at the database boundary where practical.
+- CRP/Didi access is scoped to assigned artisans and permitted assistance actions;
+
+- assisted actions record both the CRP/Didi actor and the artisan/business owner;
+
+- sensitive actions require artisan confirmation;
+
+- assistance sessions should expire or be explicitly closed;
+
+- session scope must be checked server-side on every mutation;
+
+- no client-side role flag is treated as sufficient authorization;
+
+- RLS should protect data at the database boundary where practical.
 
 ---
 
@@ -862,16 +858,14 @@ RLS should protect data at the database boundary where practical.
 ## 11.1 AI Gateway
 
 All model/provider calls use one logical gateway.
-
 ```mermaid
 flowchart LR
-    App["Application / Domain Services"] --> Gateway["AI Gateway"]
-
-    Gateway --> STT["STT Adapter"]
-    Gateway --> TTS["TTS Adapter"]
-    Gateway --> LLM["LLM Adapter"]
-    Gateway --> Translate["Translation Adapter"]
-    Gateway --> Vision["Vision Adapter"]
+    App["Application / Domain Services"] --> Gateway["AI Gateway"]
+    Gateway --> STT["STT Adapter"]
+    Gateway --> TTS["TTS Adapter"]
+    Gateway --> LLM["LLM Adapter"]
+    Gateway --> Translate["Translation Adapter"]
+    Gateway --> Vision["Vision Adapter"]
 ```
 
 The application never directly embeds provider-specific business logic.
@@ -892,18 +886,17 @@ The application never directly embeds provider-specific business logic.
 ### 11.2.1 Model Deployment Rule
 
 The ₹0 MVP uses a **self-hosted local inference node** rather than attempting to execute large models inside free edge/serverless runtimes.
-
 ```text
 Flutter App
-    ↓
+    ↓
 FastAPI / AI Gateway
-    ↓
+    ↓
 Local Inference Node (team laptop/desktop)
-    ├── IndicConformer
-    ├── Ollama + Qwen3
-    ├── IndicTrans
-    ├── Piper / TTS
-    └── Vision models
+    ├── IndicConformer
+    ├── Ollama + Qwen3
+    ├── IndicTrans
+    ├── Piper / TTS
+    └── Vision models
 ```
 
 For the SIH demonstration, the inference node can run on one designated team machine on the same trusted network or through a temporary tunnel. No paid GPU is required. CPU-only operation is the fallback, but language-model size and concurrency must be kept within the available hardware budget.
@@ -914,7 +907,6 @@ This means:
 - Supabase Edge Functions: lightweight backend utilities only.
 - Heavy AI inference: team-controlled machine for MVP.
 - Future production: replace local inference adapter with managed compute/GPU if justified.
-
 
 | Capability | ₹0 MVP Primary | Optional / Free-Tier Alternative | Selection Criteria |
 |---|---|---|---|
@@ -928,12 +920,11 @@ This means:
 ### Provider philosophy
 
 The architecture is:
-
 ```text
 Local/Open Source
-       ↓
+       ↓
 Free-Tier Cloud
-       ↓
+       ↓
 Paid Provider
 ```
 
@@ -962,14 +953,12 @@ The AI Gateway handles:
 
 ```mermaid
 flowchart LR
-    Request["AI Request"] --> Gateway["AI Gateway"]
-    Gateway --> Primary["Primary Local/Provider"]
-    Primary -->|success| Result["Result"]
-
-    Primary -->|timeout / quota / failure| Fallback["Fallback"]
-    Fallback -->|failure| Deterministic["Deterministic Fallback"]
-
-    Deterministic --> Result
+    Request["AI Request"] --> Gateway["AI Gateway"]
+    Gateway --> Primary["Primary Local/Provider"]
+    Primary -->|success| Result["Result"]
+    Primary -->|timeout / quota / failure| Fallback["Fallback"]
+    Fallback -->|failure| Deterministic["Deterministic Fallback"]
+    Deterministic --> Result
 ```
 
 ### Deterministic fallback examples
@@ -988,19 +977,17 @@ flowchart LR
 # 12. Voice Architecture
 
 ## 12.1 Voice Pipeline
-
 ```mermaid
 flowchart LR
-    Speech["Speech Input"]
-    Lang["Language Detection"]
-    STT["Speech-to-Text"]
-    Extract["Intent + Entity Extraction"]
-    Action["Action Proposal"]
-    Confirm["Voice + Visual Confirmation"]
-    Domain["Deterministic Domain Action"]
-    TTS["Voice / Visual Response"]
-
-    Speech --> Lang --> STT --> Extract --> Action --> Confirm --> Domain --> TTS
+    Speech["Speech Input"]
+    Lang["Language Detection"]
+    STT["Speech-to-Text"]
+    Extract["Intent + Entity Extraction"]
+    Action["Action Proposal"]
+    Confirm["Voice + Visual Confirmation"]
+    Domain["Deterministic Domain Action"]
+    TTS["Voice / Visual Response"]
+    Speech --> Lang --> STT --> Extract --> Action --> Confirm --> Domain --> TTS
 ```
 
 Rules:
@@ -1014,17 +1001,15 @@ Rules:
 ---
 
 # 13. Image Architecture
-
 ```mermaid
 flowchart LR
-    Capture["Original Capture"]
-    Quality["Quality / Safety Check"]
-    Segment["Subject Segmentation"]
-    Enhance["Safe Enhancement"]
-    Compare["Original + Enhanced"]
-    Store["Store Image"]
-
-    Capture --> Quality --> Segment --> Enhance --> Compare --> Store
+    Capture["Original Capture"]
+    Quality["Quality / Safety Check"]
+    Segment["Subject Segmentation"]
+    Enhance["Safe Enhancement"]
+    Compare["Original + Enhanced"]
+    Store["Store Image"]
+    Capture --> Quality --> Segment --> Enhance --> Compare --> Store
 ```
 
 ## 13.1 Allowed
@@ -1050,22 +1035,21 @@ Original media remains available for provenance.
 ---
 
 # 14. Catalog Architecture
-
 ```text
 Voice / Image
-     ↓
+     ↓
 STT + Vision
-     ↓
+     ↓
 Structured Product Attributes
-     ↓
+     ↓
 Validation
-     ↓
+     ↓
 Catalog Generation
-     ↓
+     ↓
 Hindi + English / selected regional output
-     ↓
+     ↓
 Artisan Confirmation
-     ↓
+     ↓
 Catalog Entry
 ```
 
@@ -1079,7 +1063,6 @@ The LLM must not invent:
 - sustainability claims.
 
 Where possible, generated fields should record their source:
-
 ```text
 USER_PROVIDED
 AI_EXTRACTED
@@ -1090,36 +1073,33 @@ EXTERNALLY_VERIFIED
 ---
 
 # 15. Pricing Architecture
-
 ```text
 Material Cost
 Labour Hours
 Labour Benchmark / Artisan Rate
 Packaging / Other Costs
-        |
-        +-------> Cost Floor
-
+        |
+        +-------> Cost Floor
 Product Attributes
-        |
+        |
 Market Comparables
-        |
-        +-------> Comparable Market Band
-                    |
-                    v
-              Pricing Model
-                    |
-                    v
-        Suggested Price + Range + Confidence
+        |
+        +-------> Comparable Market Band
+                    |
+                    v
+              Pricing Model
+                    |
+                    v
+        Suggested Price + Range + Confidence
 ```
 
 The Price Advisor is an **advisor**, not an oracle.
 
 If market data is unavailable or weak:
 
-> reduce confidence rather than fabricate precision.
+> Reduce confidence rather than fabricate precision.
 
 ## 15.1 Deterministic fallback
-
 ```text
 Material cost
 + Labour hours × configured labour rate
@@ -1135,20 +1115,26 @@ The artisan remains able to override the recommendation.
 # 16. Demand Matching Architecture
 
 The first implementation should be deterministic/weighted rather than a sophisticated learned marketplace model.
-
 ```mermaid
 flowchart LR
-    Product["Structured Product Profile"]
-    Demand["Buyer Search / Requirement"]
-    Normalize["Normalize Attributes"]
-    Score["Relevance / Similarity Score"]
-    Opportunity["Ranked Opportunity"]
-
-    Product --> Normalize
-    Demand --> Normalize
-    Normalize --> Score
-    Score --> Opportunity
+    Product["Structured Product Profile"]
+    Demand["Buyer Search / Requirement"]
+    Normalize["Normalize Attributes"]
+    Score["Relevance / Similarity Score"]
+    Opportunity["Ranked Opportunity"]
+    Product --> Normalize
+    Demand --> Normalize
+    Normalize --> Score
+    Score --> Opportunity
 ```
+
+The MVP score should use an explicit weighted model so recommendations remain explainable:
+```text
+Match Score = w1·craft + w2·category + w3·material + w4·price +
+              w5·quantity + w6·availability + w7·location + w8·deadline
+```
+
+Weights are configurable by deployment and must be stored with the generated match result. The UI should expose plain-language reasons such as “matches your craft,” “quantity available,” or “within buyer price range” rather than exposing model internals.
 
 Possible matching attributes:
 
@@ -1169,14 +1155,13 @@ Possible matching attributes:
 ## 17.1 Inventory
 
 Inventory must support reservation to avoid double-selling.
-
 ```text
 AVAILABLE
-   ↓ reserve
+   ↓ reserve
 RESERVED
-   ↓ confirm
+   ↓ confirm
 COMMITTED
-   ↓ fulfil
+   ↓ fulfil
 CONSUMED
 ```
 
@@ -1205,30 +1190,27 @@ For one-of-one products and low-stock variants, reservation is the authoritative
 ## 17.2 Orders
 
 Primary state machine:
-
 ```text
 NEW
- ↓
+ ↓
 CONFIRMED
- ↓
+ ↓
 PREPARING
- ↓
+ ↓
 SHIPPED
- ↓
+ ↓
 DELIVERED
- ↓
+ ↓
 COMPLETED
 ```
 
 Exception transitions:
-
 ```text
 NEW / CONFIRMED → CANCELLED
-
 CONFIRMED / PREPARING / DELIVERED
-        ↓
+        ↓
 RETURN_REQUESTED
-        ↓
+        ↓
 REFUNDED / REJECTED
 ```
 
@@ -1250,20 +1232,17 @@ The core platform owns:
 - business state.
 
 External networks are **adapters/channels**.
-
 ```mermaid
 flowchart LR
-    Core["Core Commerce Platform"]
-
-    Store["Shareable Storefront"]
-    ONDC["ONDC / Seller Network Participant"]
-    B2B["B2B Opportunity Channel"]
-    Gov["Government Procurement"]
-
-    Core --> Store
-    Core --> ONDC
-    Core --> B2B
-    Core --> Gov
+    Core["Core Commerce Platform"]
+    Store["Shareable Storefront"]
+    ONDC["ONDC / Seller Network Participant"]
+    B2B["B2B Opportunity Channel"]
+    Gov["Government Procurement"]
+    Core --> Store
+    Core --> ONDC
+    Core --> B2B
+    Core --> Gov
 ```
 
 ---
@@ -1277,14 +1256,13 @@ ONDC describes Seller Network Participants as responsible for connecting sellers
 Do **not** lock a commercial SNP.
 
 Build and validate an **ONDC adapter boundary** against the current official staging/reference resources where access is available.
-
 ```text
 Our Platform
-    ↓
+    ↓
 Seller / ONDC Adapter
-    ↓
+    ↓
 ONDC staging / reference seller app boundary
-    ↓
+    ↓
 ONDC network semantics
 ```
 
@@ -1293,27 +1271,42 @@ ONDC network semantics
 The MVP adapter should model the smallest useful seller journey:
 
 1. **Catalog publication / refresh**
-   - seller/provider identity
-   - store/catalog metadata
-   - item/category
-   - item description
-   - price
-   - availability / quantity
-   - variant information where supported
-   - media references
+
+   - seller/provider identity
+
+   - store/catalog metadata
+
+   - item/category
+
+   - item description
+
+   - price
+
+   - availability / quantity
+
+   - variant information where supported
+
+   - media references
 
 2. **Discovery acknowledgement**
-   - receive/validate catalog discovery callbacks where the sandbox flow supports them
+
+   - receive/validate catalog discovery callbacks where the sandbox flow supports them
 
 3. **Order lifecycle demonstration**
-   - `search/on_search` (or the equivalent supported catalog-discovery flow)
-   - `select/on_select`
-   - `init/on_init`
-   - `confirm/on_confirm`
-   - selected order-status callbacks
+
+   - `search/on_search` (or the equivalent supported catalog-discovery flow)
+
+   - `select/on_select`
+
+   - `init/on_init`
+
+   - `confirm/on_confirm`
+
+   - selected order-status callbacks
 
 4. **Cancellation path**
-   - `cancel/on_cancel` for the supported sandbox flow
+
+   - `cancel/on_cancel` for the supported sandbox flow
 
 The exact domain/version and mandatory fields must be taken from the **current ONDC sandbox contract used by the team**, not frozen from this architecture document. ONDC's official seller-app reference implementation lists catalog refresh, variants, availability schedules and order-flow support, while its protocol validation tooling exposes concrete search/select/init/confirm/status/cancel sequences.
 
@@ -1330,16 +1323,13 @@ The production SNP is a **Phase-2 external-deployment decision**.
 The system should not overwhelm the artisan with a long compliance form.
 
 Instead:
-
 ```text
 Market Readiness
-
 ✓ Product catalog
 ✓ Product media
 ✗ PAN
 ✗ Required certification
 ✓ Basic details
-
 "Government selling ke liye 2 cheezein aur chahiye."
 ```
 
@@ -1355,14 +1345,13 @@ The MVP implements **readiness guidance**, not full production GeM registration.
 ---
 
 ## 18.4 B2B Boundary
-
 ```text
 Buyer Requirement
-        ↓
+        ↓
 Normalize
-        ↓
+        ↓
 Match to Artisan / Cluster Capacity
-        ↓
+        ↓
 Structured Quotation
 ```
 
@@ -1400,22 +1389,20 @@ The mobile device can store:
 ---
 
 ## 19.2 Synchronization
-
 ```mermaid
 flowchart LR
-    UI["Flutter UI"]
-    Local["Local DB"]
-    Queue["Sync Queue"]
-    Network{"Connectivity"}
-    API["Backend API"]
-    DB[("PostgreSQL")]
-
-    UI <--> Local
-    Local --> Queue
-    Queue --> Network
-    Network -->|Online| API
-    API --> DB
-    Network -->|Offline| Queue
+    UI["Flutter UI"]
+    Local["Local DB"]
+    Queue["Sync Queue"]
+    Network{"Connectivity"}
+    API["Backend API"]
+    DB[("PostgreSQL")]
+    UI <--> Local
+    Local --> Queue
+    Queue --> Network
+    Network -->|Online| API
+    API --> DB
+    Network -->|Offline| Queue
 ```
 
 ---
@@ -1433,22 +1420,26 @@ Every mutation carries:
 
 ### Rule
 
-**Do not use blind last-write-wins for commerce-critical state.**
+Do not use blind last-write-wins for commerce-critical state.
 
-If an artisan edits product version `12` offline while Didi has already changed the server to version `13`:
+If an artisan edits product version `12` offline while Didi has already changed the server to version `13`, the client must fetch the relevant server version and present a **user-mediated conflict workflow** for critical fields.
 
-```text
-Offline edit v12
-     ↓
-Server v13
-     ↓
-Conflict detected
-     ↓
-+---------------------------+
-| Safe field? → auto-merge  |
-| Critical field? → review  |
-+---------------------------+
+Updated flow:
+```mermaid
+flowchart LR
+    A[Artisan App] --> B{Sync Attempt}
+    B -->|Conflict Detected| C[Fetch Server + Local Versions]
+    C --> D[Show Comparison UI]
+    D --> E{User Choice}
+    E -->|Accept Server| F[Apply Server Version]
+    E -->|Keep Local| G[Push Local Version]
+    E -->|Merge| H[Open Merge Editor]
+    H --> I[Save Merged Version]
+    I --> J[Sync to Server]
+    J --> K[Log Resolution]
 ```
+
+The comparison UI should show **Current Server**, **Your Offline Change** and, where relevant, **Merged Result** in plain language.
 
 Critical fields:
 
@@ -1457,6 +1448,15 @@ Critical fields:
 - material;
 - availability;
 - order state.
+
+Resolution rules:
+
+- safe, non-consequential fields may auto-merge;
+- critical fields require explicit review;
+- “Keep Local” is accepted only after the server revision is rechecked;
+- inventory/order conflicts must re-run deterministic domain validation before commit;
+- every resolution records the chosen version, actors, devices, base revision and resolution reason in the audit trail;
+- CRP/Didi may assist with resolution, but ownership-sensitive actions remain subject to artisan confirmation.
 
 ---
 
@@ -1501,32 +1501,29 @@ Examples:
 - speech processing;
 - market-data refresh;
 - notifications;
-- analytics.
-
+- analytics
 ```mermaid
 flowchart LR
-    API["API"] --> Queue["PostgreSQL Job Queue"]
-
-    Queue --> P0["P0 User-Waiting Jobs"]
-    Queue --> P1["P1 Normal Jobs"]
-    Queue --> P2["P2 Background Jobs"]
-
-    P0 --> Workers["Worker Processes"]
-    P1 --> Workers
-    P2 --> Workers
+    API["API"] --> Queue["PostgreSQL Job Queue"]
+    Queue --> P0["P0 User-Waiting Jobs"]
+    Queue --> P1["P1 Normal Jobs"]
+    Queue --> P2["P2 Background Jobs"]
+    P0 --> Workers["Worker Processes"]
+    P1 --> Workers
+    P2 --> Workers
 ```
 
 ### Priority
 
-**P0**
+P0
 
 Current artisan operation.
 
-**P1**
+P1
 
 Normal catalog/inventory work.
 
-**P2**
+P2
 
 Bulk processing / analytics / data refresh.
 
@@ -1550,21 +1547,20 @@ The platform stores and processes data on the artisan's behalf; it does not clai
 
 The architecture supports:
 
-- **Download My Data** — export structured profile/product/order data and owned media references.
+- **Download My Data** — export structured profile/product/order data as JSON together with owned media files where permitted, plus metadata mapping files to products/orders/stories.
 - **Delete Draft / Delete Media** — remove user-created content where no legal/transactional retention requirement prevents deletion.
 - **Voice Recording Retention Choice** — raw audio can be deleted after transcription/confirmation unless explicitly retained as a production story.
 - **Visibility Control** — artisan chooses whether a production story is public.
 
 ## 21.3 Retention Rules
-
 ```text
 Raw voice/image
-    ↓
+    ↓
 Used for processing
-    ↓
+    ↓
 Delete when no longer needed
-    OR
-    ↓
+    OR
+    ↓
 Retain because artisan explicitly published/retained it
 ```
 
@@ -1614,7 +1610,7 @@ Stores:
 
 ### ₹0 MVP
 
-**Supabase Storage Free**
+Supabase Storage Free
 
 Alternative later:
 
@@ -1628,28 +1624,30 @@ Alternative later:
 
 ## 23.1 Data Security
 
-- TLS in transit;
-- encryption at rest through managed infrastructure;
+- TLS for data in transit, with TLS 1.3 preferred where supported by the deployed stack;
+- encryption at rest through managed infrastructure, with AES-256-class encryption accepted where the selected service documents it;
 - secrets outside source code;
 - least-privilege credentials;
 - signed media URLs;
-- access-controlled object storage.
+- access-controlled object storage;
+- no architecture claim should depend on a cryptographic detail that the selected deployment cannot verify.
+
+The application-level policy is “encrypted in transit and at rest”; the exact cipher/protocol configuration is validated against the deployed Supabase/hosting/runtime configuration before production.
 
 ---
 
 ## 23.2 Authorization
 
 Every mutation checks:
-
 ```text
 Who is the caller?
-       ↓
+       ↓
 What role do they have?
-       ↓
+       ↓
 What organization / cluster do they belong to?
-       ↓
+       ↓
 Does the resource belong to the permitted scope?
-       ↓
+       ↓
 Is the action allowed in the current workflow state?
 ```
 
@@ -1703,7 +1701,7 @@ Local inference is preferred where privacy and ₹0 constraints make it practica
 
 ### Critical rule
 
-> **AI failure must reduce automation, not destroy business data.**
+>  **AI failure must reduce automation, not destroy business data.**
 
 ---
 
@@ -1789,37 +1787,31 @@ The client should:
 # 27. Deployment & DevOps
 
 ## 27.1 ₹0 MVP Deployment
-
 ```mermaid
 flowchart TB
-    User["Mobile Users"]
-    Edge["Cloudflare Free / Static Delivery"]
-    API["FastAPI Application"]
-    DB[("Supabase Free PostgreSQL")]
-    Storage[("Supabase Free Storage")]
-    Queue["PostgreSQL Job Queue"]
-    Workers["Local / Free Runtime Workers"]
-    AI["Local Open-Source Models"]
-    External["Optional Free-Tier Integrations"]
-    Logs["Structured Logs"]
-
-    User --> Edge
-    Edge --> API
-
-    API --> DB
-    API --> Storage
-    API --> Queue
-
-    Queue --> Workers
-    Workers --> AI
-    Workers --> DB
-    Workers --> Storage
-
-    API --> External
-    Workers --> External
-
-    API --> Logs
-    Workers --> Logs
+    User["Mobile Users"]
+    Edge["Cloudflare Free / Static Delivery"]
+    API["FastAPI Application"]
+    DB[("Supabase Free PostgreSQL")]
+    Storage[("Supabase Free Storage")]
+    Queue["PostgreSQL Job Queue"]
+    Workers["Local / Free Runtime Workers"]
+    AI["Local Open-Source Models"]
+    External["Optional Free-Tier Integrations"]
+    Logs["Structured Logs"]
+    User --> Edge
+    Edge --> API
+    API --> DB
+    API --> Storage
+    API --> Queue
+    Queue --> Workers
+    Workers --> AI
+    Workers --> DB
+    Workers --> Storage
+    API --> External
+    Workers --> External
+    API --> Logs
+    Workers --> Logs
 ```
 
 ### Important runtime rule
@@ -1833,10 +1825,8 @@ Local model inference runs on **team-controlled development/demo machines** (CPU
 ## 27.2 Environment Parity
 
 Use:
-
 ```text
 .env.example
-
 development
 staging
 production
@@ -1845,7 +1835,6 @@ production
 The same provider interfaces exist in every environment.
 
 Only configuration changes:
-
 ```env
 AI_STT_PROVIDER=indicconformer
 AI_LLM_PROVIDER=ollama
@@ -2000,68 +1989,57 @@ A paid service can be added only after an explicit budget decision.
 # 31. Critical End-to-End MVP Flow
 
 This is the primary implementation and demonstration path.
-
 ```mermaid
 sequenceDiagram
-    participant A as Artisan
-    participant App as Flutter App
-    participant API as Backend
-    participant AI as AI Gateway
-    participant DB as PostgreSQL
-    participant Store as Shareable Storefront
-
-    A->>App: Select language
-    A->>App: Capture product photo
-    A->>App: Speak product description
-
-    App->>API: Upload media + voice
-    API->>AI: STT / extraction / image processing
-    AI-->>API: Structured draft + enhanced image
-
-    API->>DB: Save draft
-    API-->>App: Draft + price recommendation
-
-    A->>App: Confirm / correct
-    App->>API: Publish product
-
-    API->>DB: Commit product + inventory
-    API->>Store: Create/update storefront listing
-    Store-->>API: Listing available
-
-    API-->>App: Published confirmation
+    participant A as Artisan
+    participant App as Flutter App
+    participant API as Backend
+    participant AI as AI Gateway
+    participant DB as PostgreSQL
+    participant Store as Shareable Storefront
+    A->>App: Select language
+    A->>App: Capture product photo
+    A->>App: Speak product description
+    App->>API: Upload media + voice
+    API->>AI: STT / extraction / image processing
+    AI-->>API: Structured draft + enhanced image
+    API->>DB: Save draft
+    API-->>App: Draft + price recommendation
+    A->>App: Confirm / correct
+    App->>API: Publish product
+    API->>DB: Commit product + inventory
+    API->>Store: Create/update storefront listing
+    Store-->>API: Listing available
+    API-->>App: Published confirmation
 ```
 
 ---
 
 # 32. Future Phone-Call Architecture
-
 ```mermaid
 sequenceDiagram
-    participant Artisan as Artisan
-    participant Telco as Telephony / Voice Gateway
-    participant Voice as Voice Orchestrator
-    participant Domain as Core Domain
-    participant DB as PostgreSQL
-
-    Artisan->>Telco: Calls platform number
-    Telco->>Voice: Audio / call event
-    Voice->>Voice: STT + intent extraction
-
-    Voice->>Domain: Proposed action
-    Domain->>DB: Validate / read state
-    Domain-->>Voice: Response / confirmation
-    Voice-->>Artisan: Spoken response
-
-    Artisan->>Voice: Confirmation
-    Voice->>Domain: Confirmed action
-    Domain->>DB: Commit state
+    participant Artisan as Artisan
+    participant Telco as Telephony / Voice Gateway
+    participant Voice as Voice Orchestrator
+    participant Domain as Core Domain
+    participant DB as PostgreSQL
+    Artisan->>Telco: Calls platform number
+    Telco->>Voice: Audio / call event
+    Voice->>Voice: STT + intent extraction
+    Voice->>Domain: Proposed action
+    Domain->>DB: Validate / read state
+    Domain-->>Voice: Response / confirmation
+    Voice-->>Artisan: Spoken response
+    Artisan->>Voice: Confirmation
+    Voice->>Domain: Confirmed action
+    Domain->>DB: Commit state
 ```
 
 There is intentionally **no duplicate product/order business logic** in the phone layer.
 
 ---
 
-# 33. Resolved Architecture Questions — v3
+# 33. Resolved Architecture Questions — v4
 
 | ID | Resolution |
 |---|---|
@@ -2095,7 +2073,6 @@ There is intentionally **no duplicate product/order business logic** in the phon
 For consequential recommendations, the user sees **decision factors**, not hidden model reasoning.
 
 Example pricing explanation:
-
 ```text
 Your material cost: ₹900
 Labour estimate: ₹400
@@ -2119,15 +2096,14 @@ Every consequential AI result provides a lightweight correction path:
 The correction becomes an audit event and, where appropriate, an evaluation example for later model improvement.
 
 ## 34.3 Decision Dispute Workflow
-
 ```mermaid
 flowchart LR
-    Result[AI Recommendation] --> User{User accepts?}
-    User -->|Yes| Commit[Commit / publish] 
-    User -->|No| Correct[Report / Correct]
-    Correct --> Review[Store evidence + reason]
-    Review --> Human[Didi / Admin review where needed]
-    Human --> Commit
+    Result[AI Recommendation] --> User{User accepts?}
+**    User -->|Yes| Commit[Commit / publish]**
+    User -->|No| Correct[Report / Correct]
+    Correct --> Review[Store evidence + reason]
+    Review --> Human[Didi / Admin review where needed]
+    Human --> Commit
 ```
 
 # 35. Architecture Decision Records
@@ -2231,94 +2207,95 @@ These validations should produce implementation decisions rather than remain hid
 
 ---
 
-# 38. Final Architecture Summary
+# 38. Market Research & Design Rationale
 
+The following points are treated as **design inputs and hypotheses** for the SIH architecture, not as independently verified market facts unless supported by external research:
+
+- **Competitor gap hypothesis:** many existing commerce workflows remain too operationally complex for low-digital-literacy sellers; this architecture therefore emphasizes AI-assisted cataloging, voice interaction and offline resilience.
+
+- **User-trust requirement:** simplicity and data control are addressed through confirmation workflows, explicit ownership, export/deletion controls and auditability.
+
+- **Cost-efficiency requirement:** local/open-source AI plus free managed infrastructure is the selected foundation for the **₹0 cash-cost MVP**; production-scale cost is explicitly deferred.
+
+These rationale points should be validated through artisan/CRP interviews, competitor testing and MVP usability evidence before being presented as empirical market claims.
+
+---
+
+# 39. Final Architecture Summary
 ```mermaid
 flowchart TB
-    subgraph UX["Experience Channels"]
-        App["Flutter Artisan App"]
-        Didi["Didi / CRP Mode"]
-        Phone["Phone Voice Interface - Future"]
-    end
-
-    subgraph Core["Core Platform"]
-        API["FastAPI Application"]
-        Product["Product & Catalog"]
-        Inventory["Inventory"]
-        Orders["Orders & Fulfilment"]
-        Market["Market Access"]
-        Assist["Assistance & Readiness"]
-    end
-
-    subgraph Intelligence["AI Layer"]
-        Gateway["AI Gateway"]
-        Voice["Voice Pipeline"]
-        Vision["Vision Pipeline"]
-        Catalog["Catalog AI"]
-        Pricing["Price Advisor"]
-        Match["Demand Matching"]
-    end
-
-    subgraph DataLayer["Data / Infrastructure"]
-        DB[("PostgreSQL")]
-        Storage[("Object Storage")]
-        Local["Local DB + Sync Queue"]
-        Jobs["PostgreSQL Job Queue + Workers"]
-    end
-
-    subgraph External["External Ecosystem"]
-        ONDC["ONDC / SNP - Phase 2"]
-        Gov["Government Procurement"]
-        B2B["B2B Buyers"]
-        Social["Shareable / Social Commerce"]
-        AIProviders["Optional Free-Tier / External Providers"]
-    end
-
-    App --> API
-    Didi --> API
-    Phone -. "Phase 3" .-> API
-
-    API --> Product
-    API --> Inventory
-    API --> Orders
-    API --> Market
-    API --> Assist
-
-    Product --> Gateway
-    Catalog --> Gateway
-    Pricing --> Gateway
-    Match --> Gateway
-
-    Gateway --> Voice
-    Gateway --> Vision
-    Gateway --> Catalog
-    Gateway --> Pricing
-    Gateway --> Match
-    Gateway -. "Optional" .-> AIProviders
-
-    Product --> DB
-    Inventory --> DB
-    Orders --> DB
-    Market --> DB
-    Assist --> DB
-
-    Product --> Storage
-    App <--> Local
-    Local <--> DB
-
-    Product --> Jobs
-    Orders --> Jobs
-    Jobs --> Gateway
-
-    Market --> ONDC
-    Market --> Gov
-    Market --> B2B
-    Market --> Social
+    subgraph UX["Experience Channels"]
+        App["Flutter Artisan App"]
+        Didi["Didi / CRP Mode"]
+        Phone["Phone Voice Interface - Future"]
+    end
+    subgraph Core["Core Platform"]
+        API["FastAPI Application"]
+        Product["Product & Catalog"]
+        Inventory["Inventory"]
+        Orders["Orders & Fulfilment"]
+        Market["Market Access"]
+        Assist["Assistance & Readiness"]
+    end
+    subgraph Intelligence["AI Layer"]
+        Gateway["AI Gateway"]
+        Voice["Voice Pipeline"]
+        Vision["Vision Pipeline"]
+        Catalog["Catalog AI"]
+        Pricing["Price Advisor"]
+        Match["Demand Matching"]
+    end
+    subgraph DataLayer["Data / Infrastructure"]
+        DB[("PostgreSQL")]
+        Storage[("Object Storage")]
+        Local["Local DB + Sync Queue"]
+        Jobs["PostgreSQL Job Queue + Workers"]
+    end
+    subgraph External["External Ecosystem"]
+        ONDC["ONDC / SNP - Phase 2"]
+        Gov["Government Procurement"]
+        B2B["B2B Buyers"]
+        Social["Shareable / Social Commerce"]
+        AIProviders["Optional Free-Tier / External Providers"]
+    end
+    App --> API
+    Didi --> API
+    Phone -. "Phase 3" .-> API
+    API --> Product
+    API --> Inventory
+    API --> Orders
+    API --> Market
+    API --> Assist
+    Product --> Gateway
+    Catalog --> Gateway
+    Pricing --> Gateway
+    Match --> Gateway
+    Gateway --> Voice
+    Gateway --> Vision
+    Gateway --> Catalog
+    Gateway --> Pricing
+    Gateway --> Match
+    Gateway -. "Optional" .-> AIProviders
+    Product --> DB
+    Inventory --> DB
+    Orders --> DB
+    Market --> DB
+    Assist --> DB
+    Product --> Storage
+    App <--> Local
+    Local <--> DB
+    Product --> Jobs
+    Orders --> Jobs
+    Jobs --> Gateway
+    Market --> ONDC
+    Market --> Gov
+    Market --> B2B
+    Market --> Social
 ```
 
 ## Final Architectural Principle
 
-> **One business manager, multiple interfaces, replaceable intelligence providers, deterministic commerce state, and no mandatory paid dependency for the SIH MVP.**
+>  **One business manager, multiple interfaces, replaceable intelligence providers, deterministic commerce state, and no mandatory paid dependency for the SIH MVP.**
 
 The artisan should experience one simple system.
 
@@ -2335,7 +2312,7 @@ without rebuilding the commerce core.
 
 ---
 
-# 39. Authoritative References
+# 40. Authoritative References
 
 1. Flutter — Supported platforms: https://docs.flutter.dev/reference/supported-platforms
 
@@ -2363,4 +2340,4 @@ without rebuilding the commerce core.
 
 13. Cloudflare Workers — Pricing: https://developers.cloudflare.com/workers/platform/pricing/
 
-> **External provider capabilities, current API versions, quotas, pricing, licensing, availability, participation requirements and production eligibility must be re-checked immediately before implementation. This architecture intentionally treats those as replaceable integration details rather than immutable assumptions.**
+>  **External provider capabilities, current API versions, quotas, pricing, licensing, availability, participation requirements and production eligibility must be re-checked immediately before implementation. This architecture intentionally treats those as replaceable integration details rather than immutable assumptions.**
