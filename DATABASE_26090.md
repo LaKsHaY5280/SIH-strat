@@ -1,21 +1,3 @@
-# DATABASE_26090.md
-
-## PS 26090 — AI Business Manager for Marginalized Artisans
-
-> **Purpose:** Define the database contract for the solution and architecture described in `SOLUTION_26090.md` and `ARCHITECTURE_26090_v4.md`.
->
-> **Status:** Database design baseline — ₹0 cash-cost SIH MVP
->
-> **Primary database:** PostgreSQL
->
-> **Managed MVP platform:** Supabase Free
->
-> **ORM / query layer:** Drizzle ORM
->
-> **Database principle:** Keep authoritative commerce state deterministic, strongly constrained, auditable and safe for offline synchronization while keeping AI-generated information explicitly attributable to its source.
-
----
-
 # 1. Database Goals
 
 The database must support the complete MVP without becoming tightly coupled to a single UI, AI provider or marketplace.
@@ -35,6 +17,8 @@ The database must:
 11. Support row-level authorization boundaries where practical.
 12. Remain portable PostgreSQL so Supabase can be replaced later.
 13. Remain implementable with ₹0 required cash expenditure for the SIH MVP.
+
+---
 
 ---
 
@@ -92,6 +76,8 @@ The LLM, STT model, vision model or pricing model must never directly mutate aut
 
 ---
 
+---
+
 # 3. PostgreSQL Design Principles
 
 ## 3.1 Primary Conventions
@@ -138,9 +124,52 @@ Ownership-sensitive entities should additionally contain an explicit owner or pa
 
 ---
 
+### 3.4 JSONB Policy
+
+## JSONB is appropriate for
+
+```text
+AI decision evidence
+AI model metadata
+media transformation metadata
+channel-specific configuration
+external integration metadata
+market match factor details
+optional requirement metadata
+```
+
+## JSONB is not appropriate as the sole source of truth for
+
+```text
+Product ownership
+Variant identity
+Inventory quantity
+Order state
+Reservation state
+User role
+Artisan/cluster assignment
+Payment amount
+```
+
+The rule is:
+
+> **Use relational columns for facts that affect authorization, commerce correctness, reporting or invariants. Use JSONB for extensible metadata.**
+
+---
+
+---
+
 # 4. Entity Inventory
 
 The database contains the following major entities.
+
+The database is organized around these business domains and implementation tiers.
+
+| Tier | Meaning |
+|---|---|
+| **MVP Core** | Required for the SIH demonstrable product and core business correctness |
+| **MVP Supporting** | Strongly recommended because it makes the core flows robust, explainable and auditable |
+| **Phase 2/3 Ready** | Boundary structures designed now so future capabilities do not force a schema redesign |
 
 ```text
 Identity / Access
@@ -151,16 +180,32 @@ Identity / Access
 ├── organizations
 ├── clusters
 ├── artisan_profiles
+├── craft_profiles
+├── craft_skills
+├── artisan_languages
+└── artisan_onboarding_progress
+
+Assisted Commerce
 ├── assistance_sessions
 └── assistance_session_actions
 
-Product / Catalog
+Product / Craft / Catalog
 ├── products
 ├── product_variants
 ├── product_media
+├── media_processing_jobs
+├── media_derivatives
+├── media_quality_checks
 ├── catalog_entries
+├── catalog_entry_versions
+├── catalog_publications
+├── catalog_publication_events
 ├── production_stories
-└── product_field_sources
+├── product_field_sources
+├── craft_provenance_records
+├── languages
+├── craft_categories
+└── craft_profiles / craft_skills
 
 Commerce
 ├── inventory
@@ -169,36 +214,162 @@ Commerce
 ├── customers
 ├── orders
 ├── order_items
+├── order_addresses
 ├── fulfillments
-└── payment_records
+├── fulfilment_events
+├── payment_records
+├── earnings_ledger
+├── payout_accounts
+└── payout_records
 
-AI / Intelligence
+Intelligence
 ├── voice_interactions
+├── voice_intents
+├── voice_confirmations
 ├── ai_jobs
 ├── ai_decisions
+├── ai_corrections
+├── ai_issue_reports
+├── product_costs
+├── labour_rate_profiles
+├── pricing_runs
+├── pricing_factors
 ├── price_recommendations
-├── market_comparables
-└── ai_corrections
+├── pricing_overrides
+└── market_comparables
 
 Market Access
 ├── buyer_requirements
 ├── buyer_requirement_items
+├── market_opportunities
+├── market_matches
+├── market_match_factors
+├── cluster_capacity_snapshots
 ├── quotations
 ├── quotation_items
 ├── market_readiness
-└── market_readiness_items
+├── market_readiness_items
+├── market_channels
+├── external_entity_references
+└── integration_events
 
-Offline / Reliability
+Direct Digital Commerce
+├── storefronts
+├── storefront_sections
+└── share_links
+
+Reliability / Offline
 ├── sync_queue_items
 ├── sync_conflicts
 └── sync_conflict_resolutions
 
-Governance / Audit
+Governance / Data Rights / Communication
 ├── verifications
 ├── audit_events
+├── notifications
+├── notification_deliveries
 ├── data_export_requests
 └── data_deletion_requests
 ```
+
+---
+
+### 4.1 Product Capability → Database Coverage
+
+```mermaid
+flowchart LR
+    Create[CREATE]
+    Prepare[PREPARE]
+    Sell[SELL]
+    Operate[OPERATE]
+    Assist[ASSIST]
+
+    Identity[Identity + Artisan Profile]
+    Product[Product + Variant]
+    Media[Media + Image Derivatives]
+    Voice[Voice + Intent]
+    Catalog[Catalog + Localization]
+    Pricing[Costs + Price Advice]
+    Market[Demand + Market Channels]
+    Commerce[Inventory + Orders + Fulfilment]
+    Earnings[Earnings + Payout State]
+    Assistance[CRP/Didi + Assistance Sessions]
+    Sync[Offline Sync + Conflicts]
+    Trust[Verification + Provenance]
+    Audit[Audit + AI Review + Data Rights]
+
+    Create --> Identity
+    Create --> Product
+    Create --> Media
+    Create --> Voice
+
+    Prepare --> Media
+    Prepare --> Catalog
+    Prepare --> Pricing
+    Prepare --> Trust
+
+    Sell --> Market
+    Sell --> Catalog
+    Sell --> Commerce
+
+    Operate --> Commerce
+    Operate --> Earnings
+    Operate --> Catalog
+
+    Assist --> Assistance
+    Assist --> Sync
+    Assist --> Trust
+    Assist --> Audit
+```
+
+### 4.2 Full Business Memory
+
+Full Business Memory
+
+```mermaid
+flowchart TB
+    Identity[Identity / Organization / Cluster]
+    Artisan[Artisan Profile / Craft Profile]
+    Product[Product / Variant]
+    Evidence[Media / Production Story / Provenance]
+    Catalog[Localized Catalog / Publication]
+    Pricing[Cost Inputs / Comparables / Recommendation]
+    Demand[Buyer Requirement / Match / Opportunity]
+    Commerce[Inventory / Reservation / Order]
+    Fulfilment[Fulfilment / Shipment / Delivery]
+    Money[Payment State / Earnings / Payout]
+    Assist[Assistance Session / Onboarding]
+    AI[Voice / AI Job / Decision / Correction]
+    Sync[Device / Queue / Conflict / Resolution]
+    Governance[Verification / Audit / Export / Deletion]
+
+    Identity --> Artisan
+    Artisan --> Product
+    Product --> Evidence
+    Product --> Catalog
+    Product --> Pricing
+    Product --> Demand
+    Product --> Commerce
+    Commerce --> Fulfilment
+    Fulfilment --> Money
+    Demand --> Commerce
+    Assist --> Artisan
+    Assist --> Product
+    Assist --> AI
+    AI --> Product
+    AI --> Pricing
+    AI --> Demand
+    Sync --> Product
+    Sync --> Commerce
+    Sync --> Assist
+    Governance --> Identity
+    Governance --> Artisan
+    Governance --> Product
+    Governance --> Commerce
+    Governance --> AI
+```
+
+---
 
 ---
 
@@ -262,7 +433,241 @@ erDiagram
 
 ---
 
-# 6. PostgreSQL Table Relationship Diagram
+---
+
+# 6. PostgreSQL Physical Table & Relationship Views
+
+## 6.1 Physical Table Group Map
+
+The physical PostgreSQL design can now be viewed as these bounded table groups:
+
+```mermaid
+flowchart TB
+    subgraph Identity[Identity & Organization]
+        users
+        roles
+        user_roles
+        devices
+        organizations
+        clusters
+        artisan_profiles
+        craft_profiles
+        craft_skills
+        artisan_onboarding_progress
+    end
+
+    subgraph Assist[Assisted Commerce]
+        assistance_sessions
+        assistance_session_actions
+    end
+
+    subgraph Product[Product & Catalog]
+        products
+        product_variants
+        product_media
+        media_processing_jobs
+        media_derivatives
+        media_quality_checks
+        catalog_entries
+        catalog_entry_versions
+        catalog_publications
+        catalog_publication_events
+        production_stories
+        product_field_sources
+        craft_provenance_records
+        languages
+    end
+
+    subgraph Commerce[Commerce]
+        inventory
+        inventory_reservations
+        inventory_movements
+        customers
+        orders
+        order_items
+        order_addresses
+        fulfillments
+        fulfilment_events
+        payment_records
+        earnings_ledger
+        payout_accounts
+        payout_records
+    end
+
+    subgraph AI[Intelligence]
+        voice_interactions
+        voice_intents
+        voice_confirmations
+        ai_jobs
+        ai_decisions
+        ai_corrections
+        ai_issue_reports
+        price_recommendations
+        product_costs
+        labour_rate_profiles
+        pricing_runs
+        pricing_factors
+        pricing_overrides
+        market_comparables
+    end
+
+    subgraph Market[Market Access]
+        buyer_requirements
+        buyer_requirement_items
+        market_opportunities
+        market_matches
+        market_match_factors
+        cluster_capacity_snapshots
+        quotations
+        quotation_items
+        market_readiness
+        market_readiness_items
+        market_channels
+        external_entity_references
+        integration_events
+    end
+
+    subgraph Storefront[Direct Digital Access]
+        storefronts
+        storefront_sections
+        share_links
+    end
+
+    subgraph Reliability[Offline & Reliability]
+        sync_queue_items
+        sync_conflicts
+        sync_conflict_resolutions
+    end
+
+    subgraph Governance[Governance & Data Rights]
+        verifications
+        audit_events
+        data_export_requests
+        data_deletion_requests
+        notifications
+        notification_deliveries
+    end
+```
+
+This diagram is intentionally grouped by **business responsibility**, not by deployment process.
+
+---
+
+## 6.2 Expanded Physical Relationship View
+
+The following Mermaid diagram gives the most complete high-level physical relationship view without repeating every column from the SQL sections.
+
+```mermaid
+flowchart TB
+    users --> user_roles
+    roles --> user_roles
+    users --> devices
+    organizations --> clusters
+    clusters --> artisan_profiles
+    users --> artisan_profiles
+    artisan_profiles --> craft_profiles
+    craft_profiles --> craft_skills
+    artisan_profiles --> artisan_onboarding_progress
+
+    artisan_profiles --> assistance_sessions
+    users --> assistance_sessions
+    assistance_sessions --> assistance_session_actions
+
+    artisan_profiles --> products
+    products --> product_variants
+    products --> product_media
+    product_media --> media_processing_jobs
+    product_media --> media_derivatives
+    product_media --> media_quality_checks
+    products --> catalog_entries
+    catalog_entries --> catalog_entry_versions
+    catalog_entries --> catalog_publications
+    catalog_publications --> catalog_publication_events
+    products --> production_stories
+    products --> product_field_sources
+    artisan_profiles --> craft_provenance_records
+    products --> craft_provenance_records
+    languages --> catalog_entries
+
+    product_variants --> inventory
+    product_variants --> inventory_reservations
+    product_variants --> inventory_movements
+    orders --> inventory_reservations
+
+    customers --> orders
+    orders --> order_items
+    product_variants --> order_items
+    orders --> order_addresses
+    orders --> fulfillments
+    fulfillments --> fulfilment_events
+    orders --> payment_records
+    artisan_profiles --> earnings_ledger
+    orders --> earnings_ledger
+    artisan_profiles --> payout_accounts
+    payout_accounts --> payout_records
+
+    users --> voice_interactions
+    voice_interactions --> voice_intents
+    voice_interactions --> voice_confirmations
+    voice_interactions --> ai_jobs
+    ai_jobs --> ai_decisions
+    ai_decisions --> ai_corrections
+    ai_decisions --> ai_issue_reports
+    products --> price_recommendations
+    price_recommendations --> pricing_runs
+    pricing_runs --> pricing_factors
+    products --> product_costs
+    price_recommendations --> pricing_overrides
+    price_recommendations --> market_comparables
+
+    customers --> buyer_requirements
+    buyer_requirements --> buyer_requirement_items
+    buyer_requirements --> market_opportunities
+    market_opportunities --> market_matches
+    artisan_profiles --> market_matches
+    clusters --> market_matches
+    market_matches --> market_match_factors
+    clusters --> cluster_capacity_snapshots
+    buyer_requirements --> quotations
+    clusters --> quotations
+    quotations --> quotation_items
+    product_variants --> quotation_items
+    clusters --> market_readiness
+    artisan_profiles --> market_readiness
+    market_readiness --> market_readiness_items
+
+    artisan_profiles --> storefronts
+    storefronts --> storefront_sections
+    storefronts --> share_links
+
+    users --> sync_queue_items
+    devices --> sync_queue_items
+    sync_queue_items --> sync_conflicts
+    sync_conflicts --> sync_conflict_resolutions
+
+    users --> verifications
+    users --> audit_events
+    assistance_sessions --> audit_events
+    users --> data_export_requests
+    users --> data_deletion_requests
+    users --> notifications
+    notifications --> notification_deliveries
+
+    market_channels --> catalog_publications
+    market_channels --> external_entity_references
+    market_channels --> integration_events
+```
+
+This is intentionally complementary to the ER diagram and physical table class diagram:
+
+- **ER diagram** → conceptual cardinality
+- **Physical table diagram** → PostgreSQL tables + key fields
+- **Expanded relationship view** → the complete feature/domain graph
+- **Class diagram** → application/domain concepts
+
+---
+
+## 6.3 Key-Column Physical Table Diagram
 
 This diagram is the **physical database view** of the schema. Unlike the domain class diagram below, it uses the actual PostgreSQL table names and highlights primary keys (`PK`) and foreign keys (`FK`). It is intentionally kept at the key-column level so the complete column definitions remain in the SQL table sections later in this document.
 
@@ -665,166 +1070,6 @@ classDiagram
 
 ---
 
-# 7. Class Diagram
-
-The class diagram describes the application/domain objects represented by the database. It is intentionally separate from the physical SQL schema.
-
-```mermaid
-classDiagram
-    class User {
-        +UUID id
-        +string phoneNumber
-        +string status
-        +datetime createdAt
-    }
-
-    class ArtisanProfile {
-        +UUID id
-        +UUID userId
-        +UUID clusterId
-        +string displayName
-        +string preferredLanguage
-        +string status
-    }
-
-    class Organization {
-        +UUID id
-        +string name
-        +string status
-    }
-
-    class Cluster {
-        +UUID id
-        +UUID organizationId
-        +string name
-        +string region
-    }
-
-    class AssistanceSession {
-        +UUID id
-        +UUID artisanId
-        +UUID crpUserId
-        +string scope
-        +string consentStatus
-        +datetime startedAt
-        +datetime endedAt
-    }
-
-    class Product {
-        +UUID id
-        +UUID artisanId
-        +string title
-        +string description
-        +string craftType
-        +string material
-        +string status
-        +long version
-    }
-
-    class ProductVariant {
-        +UUID id
-        +UUID productId
-        +string sku
-        +decimal unitPrice
-        +int quantity
-        +long version
-    }
-
-    class Inventory {
-        +UUID id
-        +UUID variantId
-        +int availableQuantity
-        +int reservedQuantity
-        +long version
-    }
-
-    class InventoryReservation {
-        +UUID id
-        +UUID variantId
-        +UUID orderId
-        +int quantity
-        +string status
-        +datetime expiresAt
-    }
-
-    class Order {
-        +UUID id
-        +UUID customerId
-        +string status
-        +decimal totalAmount
-        +long version
-    }
-
-    class OrderItem {
-        +UUID id
-        +UUID orderId
-        +UUID variantId
-        +int quantity
-        +decimal unitPrice
-    }
-
-    class AIJob {
-        +UUID id
-        +string capability
-        +string status
-        +string provider
-        +string model
-    }
-
-    class AIDecision {
-        +UUID id
-        +UUID aiJobId
-        +string sourceType
-        +decimal confidence
-        +string confirmationStatus
-    }
-
-    class SyncQueueItem {
-        +UUID id
-        +UUID actorUserId
-        +UUID entityId
-        +string entityType
-        +string operationType
-        +long baseRevision
-        +string idempotencyKey
-        +string status
-    }
-
-    class SyncConflict {
-        +UUID id
-        +UUID syncQueueItemId
-        +long serverRevision
-        +long clientRevision
-        +string status
-    }
-
-    class AuditEvent {
-        +UUID id
-        +UUID actorUserId
-        +string action
-        +string entityType
-        +UUID entityId
-        +string channel
-        +datetime createdAt
-    }
-
-    User "1" --> "0..1" ArtisanProfile
-    Organization "1" --> "many" Cluster
-    Cluster "1" --> "many" ArtisanProfile
-    ArtisanProfile "1" --> "many" Product
-    ArtisanProfile "1" --> "many" AssistanceSession
-    AssistanceSession "1" --> "many" AuditEvent
-    Product "1" --> "many" ProductVariant
-    ProductVariant "1" --> "many" Inventory
-    ProductVariant "1" --> "many" InventoryReservation
-    Order "1" --> "many" OrderItem
-    ProductVariant "1" --> "many" OrderItem
-    AIJob "1" --> "many" AIDecision
-    SyncQueueItem "1" --> "many" SyncConflict
-    User "1" --> "many" SyncQueueItem
-    User "1" --> "many" AuditEvent
-```
-
 ---
 
 # 7. PostgreSQL Enums
@@ -948,6 +1193,8 @@ CREATE TYPE conflict_status AS ENUM (
 
 ---
 
+---
+
 # 8. Identity & Organization Tables
 
 ## 8.1 `users`
@@ -1036,6 +1283,8 @@ CREATE INDEX idx_clusters_org_id ON clusters(organization_id);
 
 ---
 
+---
+
 # 9. Artisan & Assisted-Commerce Tables
 
 ## 9.1 `artisan_profiles`
@@ -1099,6 +1348,143 @@ CREATE TABLE assistance_session_actions (
 
 CREATE INDEX idx_assistance_session_actions_session ON assistance_session_actions(session_id);
 ```
+
+---
+
+### Craft, Provenance & Trust Model
+
+The problem statement is not only about selling products. It is about helping marginalized artisans present their identity, craft and provenance in a trustworthy way.
+
+#### Recommended Supporting Entities
+
+```text
+craft_profiles
+craft_categories
+craft_skills
+artisan_languages
+artisan_verification_profiles
+craft_provenance_records
+```
+
+#### `craft_profiles`
+
+A normalized profile for what the artisan actually makes and knows.
+
+```sql
+CREATE TABLE craft_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    artisan_id UUID NOT NULL REFERENCES artisan_profiles(id) ON DELETE CASCADE,
+    primary_craft_type TEXT NOT NULL,
+    skill_level TEXT,
+    years_of_experience INTEGER CHECK (years_of_experience >= 0),
+    description TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_craft_profiles_artisan ON craft_profiles(artisan_id);
+```
+
+#### `craft_skills`
+
+```sql
+CREATE TABLE craft_skills (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    craft_profile_id UUID NOT NULL REFERENCES craft_profiles(id) ON DELETE CASCADE,
+    skill_name TEXT NOT NULL,
+    source_type ai_source_type NOT NULL DEFAULT 'USER_PROVIDED',
+    confidence NUMERIC(5,4) CHECK (confidence BETWEEN 0 AND 1),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+#### `craft_provenance_records`
+
+```sql
+CREATE TABLE craft_provenance_records (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    artisan_id UUID NOT NULL REFERENCES artisan_profiles(id) ON DELETE CASCADE,
+    product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+    provenance_type TEXT NOT NULL,
+    region TEXT,
+    organization_name TEXT,
+    statement TEXT,
+    source_type ai_source_type NOT NULL DEFAULT 'USER_PROVIDED',
+    verified_by UUID REFERENCES users(id),
+    verified_at TIMESTAMPTZ,
+    status TEXT NOT NULL DEFAULT 'UNVERIFIED',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+#### Provenance rule
+
+AI may format or translate a provenance statement, but it must not manufacture a provenance claim. A database source marker and optional verification record should distinguish:
+
+```text
+USER_PROVIDED
+AI_EXTRACTED
+AI_GENERATED
+EXTERNALLY_VERIFIED
+```
+
+---
+
+### Onboarding Progress & Artisan Independence
+
+Didi/CRP is intended as a deployment and accessibility layer. The database should measure whether assistance is reducing over time.
+
+#### Onboarding Flow
+
+```mermaid
+flowchart LR
+    Registered[Registered]
+    Profile[Profile Ready]
+    FirstProduct[First Product]
+    Published[First Published Product]
+    FirstOpportunity[First Market Opportunity]
+    FirstOrder[First Order]
+    Independent[Artisan-led]
+
+    Registered --> Profile
+    Profile --> FirstProduct
+    FirstProduct --> Published
+    Published --> FirstOpportunity
+    FirstOpportunity --> FirstOrder
+    FirstOrder --> Independent
+```
+
+#### Supporting Tables
+
+```text
+onboarding_programs
+artisan_onboarding_progress
+onboarding_milestones
+```
+
+#### `artisan_onboarding_progress`
+
+```sql
+CREATE TABLE artisan_onboarding_progress (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    artisan_id UUID NOT NULL UNIQUE REFERENCES artisan_profiles(id) ON DELETE CASCADE,
+    current_stage TEXT NOT NULL DEFAULT 'REGISTERED',
+    assistance_level TEXT NOT NULL DEFAULT 'CRP_LED',
+    last_assisted_at TIMESTAMPTZ,
+    independent_since TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+The database can now support metrics such as:
+
+```text
+CRP-led → CRP + Artisan → Artisan-led → Independent
+```
+
+without treating Didi access as a permanent dependency.
+
+---
 
 ---
 
@@ -1229,6 +1615,202 @@ CREATE INDEX idx_product_field_sources_field ON product_field_sources(product_id
 
 ---
 
+### Media & Image-Enhancement Data Model
+
+The architecture explicitly separates original product media from safe enhancement. The database should therefore preserve the complete transformation chain rather than replacing the original file.
+
+#### Media Transformation Diagram
+
+```mermaid
+flowchart LR
+    Capture[Original Capture]
+    Original[Original Media]
+    Quality[Quality Check]
+    Transform[Safe Enhancement]
+    Derivative[Enhanced Derivative]
+    Compare[Original vs Enhanced]
+    Catalog[Published Media]
+
+    Capture --> Original
+    Original --> Quality
+    Quality --> Transform
+    Transform --> Derivative
+    Original --> Compare
+    Derivative --> Compare
+    Compare --> Catalog
+```
+
+#### Supporting Tables
+
+```text
+media_processing_jobs
+media_derivatives
+media_quality_checks
+```
+
+#### `media_processing_jobs`
+
+```sql
+CREATE TABLE media_processing_jobs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_media_id UUID NOT NULL REFERENCES product_media(id) ON DELETE CASCADE,
+    ai_job_id UUID REFERENCES ai_jobs(id),
+    operation_type TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'QUEUED',
+    requested_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    completed_at TIMESTAMPTZ
+);
+```
+
+#### `media_derivatives`
+
+```sql
+CREATE TABLE media_derivatives (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    source_media_id UUID NOT NULL REFERENCES product_media(id) ON DELETE CASCADE,
+    object_key TEXT NOT NULL,
+    derivative_type TEXT NOT NULL,
+    transformation_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    is_selected_for_catalog BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_media_derivatives_source ON media_derivatives(source_media_id);
+```
+
+#### `media_quality_checks`
+
+```sql
+CREATE TABLE media_quality_checks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_media_id UUID NOT NULL REFERENCES product_media(id) ON DELETE CASCADE,
+    quality_score NUMERIC(5,4) CHECK (quality_score BETWEEN 0 AND 1),
+    blur_score NUMERIC(8,4),
+    exposure_score NUMERIC(8,4),
+    subject_detected BOOLEAN,
+    issues JSONB NOT NULL DEFAULT '[]'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+The original capture remains the provenance anchor. An enhanced derivative can be selected for storefront/catalog publication without deleting the original.
+
+---
+
+### Catalog, Localization & Publication Model
+
+The application must support multilingual cataloging without duplicating the core product identity.
+
+#### Catalog Model
+
+```mermaid
+flowchart TB
+    Product[Canonical Product]
+    Attributes[Canonical Product Attributes]
+    LanguageA[Hindi Catalog Entry]
+    LanguageB[English Catalog Entry]
+    LanguageC[Regional Catalog Entry]
+    Store[Shareable Storefront]
+    MarketChannel[External Market Channel]
+
+    Product --> Attributes
+    Attributes --> LanguageA
+    Attributes --> LanguageB
+    Attributes --> LanguageC
+    LanguageA --> Store
+    LanguageB --> Store
+    LanguageC --> Store
+    Store --> MarketChannel
+```
+
+#### Supporting Tables
+
+```text
+languages
+catalog_entry_versions
+catalog_publications
+catalog_publication_events
+```
+
+#### `languages`
+
+```sql
+CREATE TABLE languages (
+    code TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    native_name TEXT,
+    is_enabled BOOLEAN NOT NULL DEFAULT true
+);
+```
+
+#### `catalog_entry_versions`
+
+```sql
+CREATE TABLE catalog_entry_versions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    catalog_entry_id UUID NOT NULL REFERENCES catalog_entries(id) ON DELETE CASCADE,
+    version BIGINT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    source_type ai_source_type NOT NULL,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (catalog_entry_id, version)
+);
+```
+
+#### `catalog_publications`
+
+A publication represents a channel-specific representation of a canonical product.
+
+```sql
+CREATE TABLE catalog_publications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    catalog_entry_id UUID NOT NULL REFERENCES catalog_entries(id) ON DELETE CASCADE,
+    channel_code TEXT NOT NULL,
+    external_reference TEXT,
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    published_version BIGINT,
+    last_synced_at TIMESTAMPTZ,
+    last_error_code TEXT,
+    last_error_message TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (catalog_entry_id, channel_code)
+);
+```
+
+#### Publication Event History
+
+```sql
+CREATE TABLE catalog_publication_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    catalog_publication_id UUID NOT NULL REFERENCES catalog_publications(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    request_reference TEXT,
+    response_reference TEXT,
+    payload_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+This creates a clean boundary between:
+
+```text
+Canonical Product
+        ↓
+Catalog Entry
+        ↓
+Channel Publication
+        ↓
+External Marketplace
+```
+
+---
+
+---
+
 # 11. Inventory Tables
 
 ## 11.1 `inventory`
@@ -1306,6 +1888,8 @@ Every stock mutation should happen inside one transaction that:
 6. commits atomically.
 
 No client may directly update `available_quantity` outside the domain service.
+
+---
 
 ---
 
@@ -1403,6 +1987,284 @@ CREATE TABLE payment_records (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
+
+---
+
+### B2C Storefront & Social-Commerce Model
+
+The product requires year-round access to digital demand. The MVP can use a shareable storefront link without requiring a paid social API.
+
+#### Storefront Relationship
+
+```mermaid
+flowchart TB
+    Artisan[Artisan]
+    Storefront[Shareable Storefront]
+    Catalog[Localized Catalog Entries]
+    Visitor[Buyer / Visitor]
+    Order[Internal Order]
+
+    Artisan --> Storefront
+    Storefront --> Catalog
+    Visitor --> Storefront
+    Visitor --> Order
+```
+
+#### Tables
+
+```text
+storefronts
+storefront_sections
+storefront_visits
+share_links
+```
+
+#### `storefronts`
+
+```sql
+CREATE TABLE storefronts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    artisan_id UUID NOT NULL UNIQUE REFERENCES artisan_profiles(id) ON DELETE CASCADE,
+    slug TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    headline TEXT,
+    default_language TEXT,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+#### `storefront_sections`
+
+```sql
+CREATE TABLE storefront_sections (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    storefront_id UUID NOT NULL REFERENCES storefronts(id) ON DELETE CASCADE,
+    section_type TEXT NOT NULL,
+    position INTEGER NOT NULL DEFAULT 0,
+    configuration JSONB NOT NULL DEFAULT '{}'::jsonb,
+    is_visible BOOLEAN NOT NULL DEFAULT true
+);
+```
+
+#### `share_links`
+
+```sql
+CREATE TABLE share_links (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    storefront_id UUID NOT NULL REFERENCES storefronts(id) ON DELETE CASCADE,
+    channel TEXT NOT NULL,
+    token TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+The initial MVP may simply generate a web link and let the artisan share it through WhatsApp manually. No WhatsApp Business API dependency is required.
+
+---
+
+### Fulfilment, Delivery & Buyer Context
+
+The order model should remain flexible enough to support a basic internal delivery state without pretending to implement a national logistics network.
+
+#### Supporting Tables
+
+```text
+order_addresses
+fulfilment_events
+shipping_quotes
+```
+
+#### `order_addresses`
+
+```sql
+CREATE TABLE order_addresses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    address_type TEXT NOT NULL,
+    recipient_name TEXT,
+    phone_number TEXT,
+    address_line_1 TEXT NOT NULL,
+    address_line_2 TEXT,
+    city TEXT,
+    district TEXT,
+    state TEXT,
+    postal_code TEXT,
+    country_code CHAR(2) DEFAULT 'IN',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+#### `fulfilment_events`
+
+```sql
+CREATE TABLE fulfilment_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    fulfilment_id UUID NOT NULL REFERENCES fulfillments(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    event_time TIMESTAMPTZ NOT NULL DEFAULT now(),
+    actor_user_id UUID REFERENCES users(id),
+    note TEXT,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+```
+
+The order state machine remains authoritative in `orders`; fulfilment events provide its operational history.
+
+---
+
+### Earnings & Payout-State Model
+
+The MVP does not need to implement a payment processor, but artisans still need a business-level **Money** view.
+
+#### Earnings Flow
+
+```mermaid
+flowchart LR
+    Order[Completed Order]
+    Gross[Gross Sale]
+    Fees[Fees / Adjustments]
+    Net[Net Earnings]
+    Ledger[Earnings Ledger]
+    Payout[Payout State]
+
+    Order --> Gross
+    Gross --> Fees
+    Fees --> Net
+    Net --> Ledger
+    Ledger --> Payout
+```
+
+#### Tables
+
+```text
+earnings_ledger
+payout_accounts
+payout_records
+```
+
+#### `earnings_ledger`
+
+```sql
+CREATE TABLE earnings_ledger (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    artisan_id UUID NOT NULL REFERENCES artisan_profiles(id),
+    order_id UUID REFERENCES orders(id),
+    entry_type TEXT NOT NULL,
+    amount NUMERIC(12,2) NOT NULL,
+    currency CHAR(3) NOT NULL DEFAULT 'INR',
+    status TEXT NOT NULL DEFAULT 'POSTED',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_earnings_ledger_artisan ON earnings_ledger(artisan_id, created_at DESC);
+```
+
+#### `payout_accounts`
+
+Only store the minimum information needed by the selected payout workflow.
+
+```sql
+CREATE TABLE payout_accounts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    artisan_id UUID NOT NULL REFERENCES artisan_profiles(id) ON DELETE CASCADE,
+    account_type TEXT NOT NULL,
+    masked_reference TEXT,
+    status TEXT NOT NULL DEFAULT 'PENDING_VERIFICATION',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+#### `payout_records`
+
+```sql
+CREATE TABLE payout_records (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    payout_account_id UUID NOT NULL REFERENCES payout_accounts(id),
+    amount NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+    currency CHAR(3) NOT NULL DEFAULT 'INR',
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    external_reference TEXT,
+    initiated_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+For the SIH MVP, these tables can power the **My Money** state view without claiming live bank settlement.
+
+---
+
+### Notifications & Actionable Updates
+
+Notifications should be modeled as a delivery concern, not as the business state itself.
+
+#### Notification Flow
+
+```mermaid
+flowchart LR
+    DomainEvent[Domain Event]
+    Notification[Notification Record]
+    InApp[In-App]
+    Push[Push Adapter]
+    FutureSMS[Future SMS Adapter]
+
+    DomainEvent --> Notification
+    Notification --> InApp
+    Notification --> Push
+    Notification --> FutureSMS
+```
+
+#### Tables
+
+```text
+notification_preferences
+notifications
+notification_deliveries
+```
+
+#### `notifications`
+
+```sql
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    notification_type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    entity_type TEXT,
+    entity_id UUID,
+    priority SMALLINT NOT NULL DEFAULT 1,
+    read_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_notifications_user ON notifications(user_id, created_at DESC);
+```
+
+#### `notification_deliveries`
+
+```sql
+CREATE TABLE notification_deliveries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    notification_id UUID NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+    channel TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    provider TEXT,
+    external_reference TEXT,
+    delivered_at TIMESTAMPTZ,
+    error_code TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+No paid SMS provider is required by the MVP.
+
+---
 
 ---
 
@@ -1530,6 +2392,262 @@ CREATE TABLE market_comparables (
 
 ---
 
+### Voice, Intent & Conversation Data Model
+
+Voice is a primary interface, not merely an STT utility. The database should retain enough structured information to reconstruct what happened without retaining unnecessary raw audio indefinitely.
+
+#### Voice Interaction Flow
+
+```mermaid
+flowchart LR
+    Speech[Speech Input]
+    Interaction[Voice Interaction]
+    Transcript[Transcript]
+    Intent[Intent + Entities]
+    Proposal[Action Proposal]
+    Confirmation[Confirmation]
+    Action[Domain Action]
+
+    Speech --> Interaction
+    Interaction --> Transcript
+    Transcript --> Intent
+    Intent --> Proposal
+    Proposal --> Confirmation
+    Confirmation --> Action
+```
+
+#### Supporting Tables
+
+```text
+voice_intents
+voice_entities
+voice_confirmations
+```
+
+#### `voice_intents`
+
+```sql
+CREATE TABLE voice_intents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    voice_interaction_id UUID NOT NULL REFERENCES voice_interactions(id) ON DELETE CASCADE,
+    intent_name TEXT NOT NULL,
+    confidence NUMERIC(5,4) CHECK (confidence BETWEEN 0 AND 1),
+    entities JSONB NOT NULL DEFAULT '{}'::jsonb,
+    proposed_action JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+#### `voice_confirmations`
+
+```sql
+CREATE TABLE voice_confirmations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    voice_interaction_id UUID NOT NULL REFERENCES voice_interactions(id) ON DELETE CASCADE,
+    confirmation_method TEXT NOT NULL,
+    confirmation_status TEXT NOT NULL,
+    confirmed_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+Critical rule:
+
+```text
+voice_interactions
+    ↓
+voice_intents
+    ↓
+AI decision
+    ↓
+confirmation
+    ↓
+deterministic domain service
+```
+
+Never:
+
+```text
+voice transcript → direct UPDATE products/orders/inventory
+```
+
+---
+
+### Costing & Dynamic Price-Advice Model
+
+Dynamic pricing requires more than one `suggested_price` column. The database should preserve the evidence used to produce a recommendation.
+
+#### Pricing Data Flow
+
+```mermaid
+flowchart LR
+    Materials[Material Cost]
+    Labour[Labour Cost]
+    Packaging[Packaging / Other Cost]
+    Product[Product Attributes]
+    Comparables[Market Comparables]
+    Demand[Demand Signals]
+    CostFloor[Cost Floor]
+    MarketBand[Comparable Band]
+    Advisor[Price Advisor]
+    Recommendation[Recommendation + Range + Confidence]
+    Artisan[Artisan Confirmation / Override]
+
+    Materials --> CostFloor
+    Labour --> CostFloor
+    Packaging --> CostFloor
+    Product --> MarketBand
+    Comparables --> MarketBand
+    Demand --> Advisor
+    CostFloor --> Advisor
+    MarketBand --> Advisor
+    Advisor --> Recommendation
+    Recommendation --> Artisan
+```
+
+#### Supporting Tables
+
+```text
+product_costs
+labour_rate_profiles
+pricing_runs
+pricing_factors
+pricing_overrides
+```
+
+#### `product_costs`
+
+```sql
+CREATE TABLE product_costs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    material_cost NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (material_cost >= 0),
+    labour_hours NUMERIC(8,2) CHECK (labour_hours >= 0),
+    labour_cost NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (labour_cost >= 0),
+    packaging_cost NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (packaging_cost >= 0),
+    other_cost NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (other_cost >= 0),
+    currency CHAR(3) NOT NULL DEFAULT 'INR',
+    source_type ai_source_type NOT NULL DEFAULT 'USER_PROVIDED',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_product_costs_product ON product_costs(product_id, created_at DESC);
+```
+
+#### `labour_rate_profiles`
+
+```sql
+CREATE TABLE labour_rate_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID REFERENCES organizations(id),
+    craft_type TEXT,
+    region TEXT,
+    hourly_rate NUMERIC(12,2) NOT NULL CHECK (hourly_rate >= 0),
+    currency CHAR(3) NOT NULL DEFAULT 'INR',
+    valid_from DATE NOT NULL,
+    valid_to DATE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+#### `pricing_runs`
+
+```sql
+CREATE TABLE pricing_runs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    recommendation_id UUID REFERENCES price_recommendations(id),
+    method TEXT NOT NULL,
+    model_name TEXT,
+    model_version TEXT,
+    market_data_available BOOLEAN NOT NULL DEFAULT false,
+    confidence NUMERIC(5,4) CHECK (confidence BETWEEN 0 AND 1),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+#### `pricing_factors`
+
+```sql
+CREATE TABLE pricing_factors (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    pricing_run_id UUID NOT NULL REFERENCES pricing_runs(id) ON DELETE CASCADE,
+    factor_name TEXT NOT NULL,
+    factor_value JSONB NOT NULL,
+    contribution NUMERIC(12,4),
+    source_reference TEXT
+);
+```
+
+#### `pricing_overrides`
+
+```sql
+CREATE TABLE pricing_overrides (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    recommendation_id UUID NOT NULL REFERENCES price_recommendations(id) ON DELETE CASCADE,
+    previous_price NUMERIC(12,2),
+    selected_price NUMERIC(12,2) NOT NULL,
+    overridden_by UUID NOT NULL REFERENCES users(id),
+    reason TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+This lets the system explain pricing in plain language without storing model chain-of-thought.
+
+---
+
+### AI Decision Review & Dispute Model
+
+The architecture requires AI auditability without storing hidden chain-of-thought. The database should therefore make **decision evidence, confidence, correction and dispute** explicit.
+
+#### Review Flow
+
+```mermaid
+flowchart LR
+    AIResult[AI Result]
+    Confirmation[User Confirmation]
+    Override[User Override]
+    Report[Report Issue]
+    Review[Review / Correction]
+    LearningSignal[Quality Signal]
+
+    AIResult --> Confirmation
+    AIResult --> Override
+    AIResult --> Report
+    Report --> Review
+    Override --> Review
+    Review --> LearningSignal
+```
+
+#### Supporting table
+
+```text
+ai_issue_reports
+```
+
+```sql
+CREATE TABLE ai_issue_reports (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ai_decision_id UUID NOT NULL REFERENCES ai_decisions(id) ON DELETE CASCADE,
+    reported_by UUID NOT NULL REFERENCES users(id),
+    issue_type TEXT NOT NULL,
+    description TEXT,
+    severity TEXT NOT NULL DEFAULT 'MEDIUM',
+    resolution_status TEXT NOT NULL DEFAULT 'OPEN',
+    resolved_by UUID REFERENCES users(id),
+    resolution_notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    resolved_at TIMESTAMPTZ
+);
+```
+
+This is the database representation of a **Report / Correct AI Output** workflow.
+
+---
+
+---
+
 # 14. B2B & Market Access Tables
 
 ## 14.1 `buyer_requirements`
@@ -1621,6 +2739,235 @@ CREATE TABLE market_readiness_items (
 
 ---
 
+### Demand Matching & Opportunity Model
+
+The Market Access Engine is more than a quotation table. It needs to persist the buyer demand signal and the platform's explainable matching result.
+
+#### Matching Flow
+
+```mermaid
+flowchart LR
+    Requirement[Buyer Requirement]
+    Normalize[Normalized Demand Attributes]
+    Candidate[Eligible Artisan / Cluster Candidates]
+    Score[Weighted Match Score]
+    Opportunity[Market Opportunity]
+    Quote[Quotation]
+
+    Requirement --> Normalize
+    Normalize --> Candidate
+    Candidate --> Score
+    Score --> Opportunity
+    Opportunity --> Quote
+```
+
+#### Supporting Tables
+
+```text
+market_opportunities
+market_matches
+market_match_factors
+cluster_capacity_snapshots
+```
+
+#### `market_opportunities`
+
+```sql
+CREATE TABLE market_opportunities (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    buyer_requirement_id UUID NOT NULL REFERENCES buyer_requirements(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'OPEN',
+    expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+#### `market_matches`
+
+```sql
+CREATE TABLE market_matches (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    opportunity_id UUID NOT NULL REFERENCES market_opportunities(id) ON DELETE CASCADE,
+    artisan_id UUID REFERENCES artisan_profiles(id),
+    cluster_id UUID REFERENCES clusters(id),
+    score NUMERIC(7,4) NOT NULL,
+    score_version TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'SUGGESTED',
+    generated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_market_matches_opportunity ON market_matches(opportunity_id, score DESC);
+```
+
+#### `market_match_factors`
+
+```sql
+CREATE TABLE market_match_factors (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    match_id UUID NOT NULL REFERENCES market_matches(id) ON DELETE CASCADE,
+    factor_name TEXT NOT NULL,
+    weight NUMERIC(7,4),
+    normalized_score NUMERIC(7,4),
+    explanation TEXT
+);
+```
+
+The UI should be able to say:
+
+```text
+Strong match because:
+✓ same craft
+✓ within buyer price range
+✓ quantity available
+✓ delivery date achievable
+```
+
+without exposing model internals.
+
+#### `cluster_capacity_snapshots`
+
+```sql
+CREATE TABLE cluster_capacity_snapshots (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cluster_id UUID NOT NULL REFERENCES clusters(id),
+    craft_type TEXT,
+    available_quantity INTEGER NOT NULL DEFAULT 0,
+    estimated_monthly_capacity INTEGER,
+    snapshot_date DATE NOT NULL,
+    source_type ai_source_type NOT NULL DEFAULT 'USER_PROVIDED',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+---
+
+### ONDC / External Market Integration Persistence Boundary
+
+The database must support external market adapters without importing their protocol into the core commerce schema.
+
+#### Integration Boundary
+
+```mermaid
+flowchart TB
+    Core[Core Commerce Tables]
+    Connector[Market Connector]
+    Publication[Catalog Publication]
+    ExternalRef[External References]
+    Events[Integration Events]
+    External[ONDC / Future Market Network]
+
+    Core --> Connector
+    Connector --> Publication
+    Connector --> ExternalRef
+    Connector --> Events
+    Publication --> External
+    Events --> External
+```
+
+#### Supporting Tables
+
+```text
+market_channels
+external_entity_references
+integration_events
+integration_sync_states
+```
+
+#### `market_channels`
+
+```sql
+CREATE TABLE market_channels (
+    code TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    channel_type TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    configuration JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+```
+
+#### `external_entity_references`
+
+```sql
+CREATE TABLE external_entity_references (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    channel_code TEXT NOT NULL REFERENCES market_channels(code),
+    entity_type TEXT NOT NULL,
+    entity_id UUID NOT NULL,
+    external_id TEXT NOT NULL,
+    external_version TEXT,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (channel_code, entity_type, entity_id),
+    UNIQUE (channel_code, entity_type, external_id)
+);
+```
+
+#### `integration_events`
+
+```sql
+CREATE TABLE integration_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    channel_code TEXT NOT NULL REFERENCES market_channels(code),
+    direction TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    entity_type TEXT,
+    entity_id UUID,
+    request_reference TEXT,
+    response_reference TEXT,
+    status TEXT NOT NULL DEFAULT 'RECEIVED',
+    payload_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+The actual ONDC domain/version payload remains an adapter concern. The core database stores normalized business state plus enough external references/event history for reconciliation.
+
+---
+
+### Government / GeM Readiness Model
+
+The MVP supports guided readiness, not production registration.
+
+#### Readiness Model
+
+```mermaid
+flowchart LR
+    Product[Product Ready]
+    Identity[Identity / KYC Ready]
+    Media[Media Ready]
+    Compliance[Compliance Requirements]
+    Channel[Channel Readiness]
+    Result[Readiness Status]
+
+    Product --> Result
+    Identity --> Result
+    Media --> Result
+    Compliance --> Result
+    Channel --> Result
+```
+
+The existing `market_readiness` / `market_readiness_items` tables should represent channel-neutral requirements. GeM-specific requirements are configuration/reference data rather than hardcoded columns in artisan records.
+
+Example requirement configuration:
+
+```json
+{
+  "channel": "GOVERNMENT",
+  "requirement_code": "PAN",
+  "severity": "BLOCKING",
+  "assistance_recommended": true
+}
+```
+
+This supports future government channels without redesigning the artisan schema.
+
+---
+
+---
+
 # 15. Offline Sync & Conflict Tables
 
 ## 15.1 `sync_queue_items`
@@ -1707,6 +3054,8 @@ Inventory / order conflicts
 
 ---
 
+---
+
 # 16. Verification, Audit & Data Rights Tables
 
 ## 16.1 `verifications`
@@ -1781,6 +3130,8 @@ Deletion must respect transactional and audit-retention requirements.
 
 ---
 
+---
+
 # 17. Database Class / Responsibility Mapping
 
 | Database area | Authoritative responsibility |
@@ -1809,6 +3160,37 @@ Deletion must respect transactional and audit-retention requirements.
 | `audit_events` | System accountability |
 | `data_export_requests` | Data portability |
 | `data_deletion_requests` | Data deletion workflow |
+
+---
+
+### 17.1 Operational Analytics Foundations
+
+Analytics should not replace the operational schema. The MVP can derive metrics from operational events and add denormalized analytics later.
+
+Useful derived metrics include:
+
+```text
+Time to first listing
+Time to first sale
+CRP assistance rate
+AI correction rate
+AI fallback rate
+Conflict rate
+Inventory oversell prevention events
+Listing-to-order conversion
+Average order value
+Market opportunity response rate
+Quotation acceptance rate
+Artisan independence progression
+```
+
+## 55.1 Event Model
+
+The existing `audit_events`, `ai_jobs`, `notifications`, `orders`, `sync_queue_items` and assistance tables provide the event sources needed for the first metrics layer.
+
+A separate analytics warehouse is explicitly **not required for MVP**.
+
+---
 
 ---
 
@@ -1886,6 +3268,8 @@ stateDiagram-v2
 
 ---
 
+---
+
 # 19. Critical Database Constraints
 
 The following rules are architectural requirements, not optional implementation details.
@@ -1927,6 +3311,85 @@ The following rules are architectural requirements, not optional implementation 
 - idempotency keys must be unique
 - stale revisions must produce conflict rather than silent overwrite
 - conflict resolution must be auditable
+
+---
+
+### 19.1 Extended Domain Integrity Rules
+
+### Identity
+
+```text
+A user may have multiple roles.
+A user may have multiple registered devices.
+A device can be revoked without deleting the user.
+An artisan profile belongs to exactly one user.
+```
+
+### Organization
+
+```text
+A cluster belongs to one organization.
+An artisan may belong to at most one primary cluster in MVP.
+CRP/Didi access is restricted by assignment + AssistanceSession scope.
+```
+
+### Product
+
+```text
+A product belongs to one artisan.
+A variant belongs to one product.
+Media belongs to a product and optionally a variant.
+Original media cannot be silently replaced by an enhancement.
+```
+
+### Inventory
+
+```text
+One variant has one authoritative inventory row in MVP.
+Available quantity cannot become negative.
+Reserved quantity cannot become negative.
+Reservations cannot exceed available stock.
+Every mutation creates an InventoryMovement.
+Every critical mutation validates the current version.
+```
+
+### Orders
+
+```text
+Order items preserve product/variant snapshots.
+Order totals are deterministic.
+Order state transitions follow the defined state machine.
+An order cannot commit inventory twice.
+Cancellation releases the correct reservation exactly once.
+```
+
+### AI
+
+```text
+AI output is never authoritative commerce state.
+AI decisions record source, confidence and evidence where applicable.
+Critical mutations require confirmation.
+AI corrections are auditable.
+```
+
+### Sync
+
+```text
+Each offline mutation has an idempotency key.
+A stale base revision cannot silently overwrite server state.
+Critical conflicts require explicit resolution.
+Resolution is itself auditable.
+```
+
+### Data rights
+
+```text
+Exports are attributable to the requesting user.
+Deletion cannot remove required transactional/audit records blindly.
+Raw voice can expire after processing unless retained intentionally.
+```
+
+---
 
 ---
 
@@ -1994,6 +3457,57 @@ audit_events
 
 ---
 
+### 20.1 Recommended Access-Pattern Index Set
+
+```text
+Identity
+- users(phone_number)
+- devices(user_id, status)
+- clusters(organization_id)
+- artisan_profiles(cluster_id)
+
+Products
+- products(artisan_id, status)
+- products(craft_type, category)
+- product_variants(product_id)
+- product_variants(sku)
+- catalog_entries(product_id, language_code, channel)
+
+Commerce
+- inventory(variant_id)
+- inventory_reservations(variant_id, status)
+- inventory_movements(variant_id, created_at DESC)
+- orders(customer_id, created_at DESC)
+- orders(status, created_at DESC)
+- order_items(order_id)
+
+AI
+- ai_jobs(status, priority, created_at)
+- ai_decisions(entity_type, entity_id)
+- price_recommendations(product_id, created_at DESC)
+
+Market
+- buyer_requirements(status, delivery_deadline)
+- market_matches(opportunity_id, score DESC)
+- quotations(requirement_id, status)
+
+Sync
+- sync_queue_items(status, created_at)
+- sync_queue_items(entity_type, entity_id)
+- sync_conflicts(status, created_at)
+
+Governance
+- audit_events(entity_type, entity_id, created_at DESC)
+- audit_events(actor_user_id, created_at DESC)
+- notifications(user_id, created_at DESC)
+```
+
+Partial/filtered indexes should be used where they materially reduce queue or conflict scans.
+
+---
+
+---
+
 # 21. Row-Level Security Strategy
 
 Supabase/PostgreSQL RLS should reinforce application authorization, not replace it.
@@ -2043,6 +3557,8 @@ Domain workflow validation
         =
 Defense in depth
 ```
+
+---
 
 ---
 
@@ -2106,6 +3622,8 @@ COMMIT
 
 ---
 
+---
+
 # 23. Triggers / Database Functions
 
 Database functions should remain limited to integrity concerns. Business workflows belong in the domain layer.
@@ -2121,6 +3639,8 @@ validate_revision()
 A generic `updated_at` trigger may be used for mutable tables.
 
 Inventory reservation logic should remain an explicit transactional domain operation so it can be tested independently and logged with actor/session context.
+
+---
 
 ---
 
@@ -2150,6 +3670,8 @@ backend/
 ```
 
 The exact Drizzle runtime/language binding must follow the final backend implementation choice; the PostgreSQL schema remains authoritative and portable.
+
+---
 
 ---
 
@@ -2198,6 +3720,36 @@ flowchart LR
 
 ---
 
+### 25.3 Extended Migration & Versioning Policy
+
+```mermaid
+flowchart LR
+    SchemaChange[Schema Change]
+    Migration[Drizzle Migration]
+    LocalTest[Local PostgreSQL Test]
+    SeedTest[Seed + Integration Test]
+    Review[Schema Review]
+    Deploy[Apply Migration]
+
+    SchemaChange --> Migration
+    Migration --> LocalTest
+    LocalTest --> SeedTest
+    SeedTest --> Review
+    Review --> Deploy
+```
+
+Rules:
+
+1. Never edit production schema manually when a migration can represent the change.
+2. Never silently change enum meaning without migration review.
+3. Backward-compatible migrations are preferred for deployed versions.
+4. Data migrations must be explicit and testable.
+5. Every migration must be reproducible from a clean database.
+
+---
+
+---
+
 # 26. Seed Data
 
 The MVP should have deterministic seed data for demonstration.
@@ -2238,6 +3790,8 @@ Seed data must never contain real personally identifiable information.
 
 ---
 
+---
+
 # 27. Backup & Recovery
 
 The MVP should not introduce a paid backup platform solely for SIH.
@@ -2251,6 +3805,8 @@ However, the database design should assume:
 - database recovery procedures should be documented before production deployment.
 
 Supabase-managed backup capabilities, retention and recovery limits must be checked against the actual deployment plan rather than assumed from this design.
+
+---
 
 ---
 
@@ -2268,6 +3824,8 @@ Supabase-managed backup capabilities, retention and recovery limits must be chec
 | Audit events | Accountability record | Longer retention |
 | AI job logs | Operational record | Minimize payload and retain according to policy |
 | Export packages | Temporary | Expire after download window |
+
+---
 
 ---
 
@@ -2295,6 +3853,8 @@ export.zip
 
 ---
 
+---
+
 # 30. Database-to-Feature Traceability
 
 | Product / architecture feature | Primary database entities |
@@ -2315,6 +3875,35 @@ export.zip
 | Data export | `data_export_requests` + domain/media records |
 | Data deletion | `data_deletion_requests` |
 | Verification / trust | `verifications`, `product_field_sources`, `audit_events` |
+
+---
+
+### 30.1 Expanded Problem-Statement Traceability
+
+| Problem / Requirement | Database support |
+|---|---|
+| Low digital literacy | voice interactions, guided confirmations, assistance sessions |
+| Language barriers | languages, catalog entries, voice language metadata |
+| Photography difficulty | product media, quality checks, media derivatives |
+| Image enhancement | processing jobs, derivatives, provenance linkage |
+| Product cataloging | products, variants, catalog entries, localized versions |
+| Voice cataloging | voice interactions, intents, AI decisions |
+| Dynamic pricing | costs, comparables, pricing runs, recommendations |
+| Market access | storefronts, catalog publications, opportunities, channels |
+| B2B demand | buyer requirements, matches, quotations |
+| Inventory reliability | inventory, reservations, movement audit |
+| Year-round selling | storefront, catalog publication, buyer requirements |
+| Assisted onboarding | assistance sessions, onboarding progress |
+| Offline usage | sync queue, conflicts, resolutions |
+| Trust / provenance | field sources, production stories, provenance, verification |
+| AI safety | AI decisions, confirmation, corrections, issue reports |
+| Data ownership | export requests, deletion requests, source/ownership metadata |
+| Order management | orders, items, fulfilment, payment state |
+| Artisan earnings | earnings ledger, payout state |
+| Future ONDC | channel publications, external references, integration events |
+| Government readiness | market readiness + requirement items |
+
+---
 
 ---
 
@@ -2339,6 +3928,8 @@ Before database implementation is considered complete:
 [ ] Export requests expire
 [ ] Deletion does not accidentally destroy required transaction history
 ```
+
+---
 
 ---
 
@@ -2389,6 +3980,8 @@ Test:
 - resolution by Keep Local;
 - resolution by Merge;
 - audit of resolution.
+
+---
 
 ---
 
@@ -2461,6 +4054,72 @@ AI suggests wrong material
 
 ---
 
+### 33.2 Expanded Validation Scenarios
+
+## Scenario F — Product Image Enhancement
+
+```text
+1. Artisan captures original image.
+2. product_media stores original object key.
+3. media_processing_jobs records enhancement request.
+4. Enhanced derivative is written separately.
+5. Artisan compares original and enhanced image.
+6. Selected derivative is referenced by publication.
+7. Original remains available for provenance.
+```
+
+## Scenario G — AI Pricing Recommendation
+
+```text
+1. Artisan provides material/labour information.
+2. product_costs stores cost inputs.
+3. Market comparables are loaded if available.
+4. pricing_run records calculation method.
+5. pricing_factors record decision evidence.
+6. price_recommendations stores range + confidence.
+7. Artisan accepts or overrides.
+8. Override is recorded.
+```
+
+## Scenario H — B2B Opportunity
+
+```text
+1. Buyer creates buyer_requirement.
+2. Requirement items normalize requested attributes.
+3. market_opportunities represents the active demand signal.
+4. Candidate artisans/clusters are matched.
+5. market_matches store weighted score.
+6. market_match_factors explain the score.
+7. Cluster creates quotation.
+8. Buyer receives structured quotation.
+```
+
+## Scenario I — Shareable Storefront
+
+```text
+1. Artisan storefront exists.
+2. Published catalog entries are selected.
+3. share_link is generated.
+4. Buyer opens storefront.
+5. Buyer creates internal order.
+6. Inventory is reserved.
+```
+
+## Scenario J — AI Error Report
+
+```text
+1. AI generates catalog field.
+2. ai_decision stores source/evidence/confidence.
+3. Artisan corrects field.
+4. ai_correction stores correction.
+5. Optional ai_issue_report is created.
+6. Review status is tracked.
+```
+
+---
+
+---
+
 # 34. MVP Database Scope
 
 ## Must Implement
@@ -2530,6 +4189,111 @@ Governance
 
 ---
 
+### 34.4 Expanded Table Classification
+
+Not every table above must be built on day one.
+
+#### MVP Core Tables
+
+```text
+users
+roles
+user_roles
+devices
+organizations
+clusters
+artisan_profiles
+assistance_sessions
+assistance_session_actions
+
+products
+product_variants
+product_media
+catalog_entries
+production_stories
+product_field_sources
+
+inventory
+inventory_reservations
+inventory_movements
+customers
+orders
+order_items
+fulfillments
+payment_records
+
+audio/voice interactions
+voice_interactions
+ai_jobs
+ai_decisions
+ai_corrections
+price_recommendations
+market_comparables
+
+buyer_requirements
+buyer_requirement_items
+quotations
+quotation_items
+market_readiness
+market_readiness_items
+
+sync_queue_items
+sync_conflicts
+sync_conflict_resolutions
+
+audit_events
+verifications
+data_export_requests
+data_deletion_requests
+```
+
+#### Strongly Recommended Supporting Tables
+
+```text
+craft_profiles
+craft_skills
+media_processing_jobs
+media_derivatives
+media_quality_checks
+catalog_entry_versions
+catalog_publications
+catalog_publication_events
+product_costs
+pricing_runs
+pricing_factors
+pricing_overrides
+market_opportunities
+market_matches
+market_match_factors
+storefronts
+storefront_sections
+share_links
+order_addresses
+fulfilment_events
+earnings_ledger
+notifications
+notification_deliveries
+```
+
+#### Phase 2 / 3 Ready Tables
+
+```text
+labour_rate_profiles
+cluster_capacity_snapshots
+market_channels
+external_entity_references
+integration_events
+payout_accounts
+payout_records
+ai_issue_reports
+```
+
+These future-ready structures should not create implementation dependencies for the SIH MVP.
+
+---
+
+---
+
 # 35. Implementation Order
 
 ```mermaid
@@ -2566,6 +4330,8 @@ Recommended order:
 
 ---
 
+---
+
 # 36. Open Database Decisions
 
 These items should be explicitly decided during implementation rather than silently assumed.
@@ -2580,6 +4346,8 @@ These items should be explicitly decided during implementation rather than silen
 | Payment-provider-specific fields | Keep adapter-owned; do not pollute core payment state |
 | ONDC-specific persistence | Keep external payloads in adapter/integration storage only as required |
 | Full data retention durations | Must be finalized against operational/legal requirements before production |
+
+---
 
 ---
 
@@ -2613,7 +4381,53 @@ The database is ready for API development when:
 
 ---
 
+---
+
 # 38. Final Database Principle
+
+> **PostgreSQL is the authoritative business memory of PROMETHEUS.**
+>
+> AI may interpret, extract and recommend. The application may orchestrate. The artisan may confirm. CRP/Didi may assist. External marketplaces may request or report state.
+>
+> **But deterministic domain services and PostgreSQL remain the final authority over ownership, inventory, orders, permissions, and auditability.**
+
+---
+
+### 38.1 Final Expanded Database Position
+
+The database is intentionally broader than a basic CRUD schema because PROMETHEUS is broader than a basic marketplace.
+
+It must remember:
+
+```text
+WHO the artisan is
+WHAT they make
+HOW it is made
+WHERE it comes from
+WHAT the product looks like
+WHAT the AI understood
+WHAT the AI proposed
+WHAT the artisan confirmed
+WHAT the product costs
+WHY a price was suggested
+WHERE demand exists
+WHICH channels published the product
+HOW much inventory exists
+WHICH stock is reserved
+WHAT orders happened
+HOW fulfilment progressed
+WHAT the artisan earned
+WHO assisted the artisan
+WHAT happened offline
+WHICH changes conflicted
+HOW conflicts were resolved
+WHAT was verified
+WHAT AI made a mistake
+WHAT data the artisan requested
+WHAT must be retained
+```
+
+The core architectural rule remains:
 
 > **PostgreSQL is the authoritative business memory of PROMETHEUS.**
 >
