@@ -30,6 +30,94 @@ flowchart LR
 
 ---
 
+# 1. Platform Architecture & Traceability
+
+The wireframe is a frontend contract, not an isolated UX artifact. Every screen resolves through the same chain:
+
+```mermaid
+flowchart LR
+    UI["Wireframe Screen"] --> API["FastAPI Endpoint"]
+    API --> AUTH["Auth / RBAC / Scope"]
+    API --> DOMAIN["Deterministic Domain Service"]
+    DOMAIN --> DB[("PostgreSQL Tables")]
+    API --> AI["AI Gateway / Async Job"]
+    AI --> DB
+    DOMAIN --> AUDIT["Audit / Event Trail"]
+    LOCAL["Seller Local DB / Sync Queue"] --> API
+    API --> LOCAL
+```
+
+## 1.1 Screen Traceability Rule
+
+Each screen specification in this document has five implementation bindings:
+
+| Binding | Meaning | Source contract |
+|---|---|---|
+| UI responsibility | What the user is trying to accomplish | Wireframe |
+| API operation | Exact read/mutation used by the screen | `API_26090_v2.md` |
+| Authorization | Role, ownership, session or buyer scope | `AUTH_26090.md` + API |
+| Database state | Tables that provide or persist the screen data | `DATABASE_26090_B2B_B2C.md` |
+| State authority | Whether the UI reflects server truth, local draft, AI proposal or external state | Architecture/API |
+
+## 1.2 Platform-to-Backend Map
+
+```mermaid
+flowchart TB
+    subgraph SELLER["Seller App"]
+        ArtisanUI["Artisan UI"]
+        DidiUI["Didi / CRP UI"]
+        Local["SQLite + Drift + Sync Queue"]
+    end
+    subgraph BUYER["Buyer Web"]
+        B2CUI["B2C UI"]
+        B2BUI["B2B UI"]
+        BuyerSession["Buyer Session"]
+    end
+    subgraph APIAPP["Shared FastAPI"]
+        AuthAPI["Auth + Scope"]
+        ProductAPI["Product / Catalog"]
+        CommerceAPI["Inventory / Cart / Checkout / Orders"]
+        MarketAPI["Discovery / B2B / Readiness"]
+        AssistAPI["Assistance / Sync"]
+        AIAPI["Voice / AI / Pricing"]
+    end
+    DB[("PostgreSQL")]
+    ArtisanUI --> AuthAPI
+    DidiUI --> AuthAPI
+    Local <--> AssistAPI
+    B2CUI --> BuyerSession --> AuthAPI
+    B2BUI --> BuyerSession
+    AuthAPI --> ProductAPI
+    AuthAPI --> CommerceAPI
+    AuthAPI --> MarketAPI
+    AuthAPI --> AssistAPI
+    AuthAPI --> AIAPI
+    ProductAPI --> DB
+    CommerceAPI --> DB
+    MarketAPI --> DB
+    AssistAPI --> DB
+    AIAPI --> DB
+```
+
+## 1.3 Shared-State Rule
+
+```mermaid
+flowchart LR
+    Seller["Seller App"] --> ProductState["Product / Variant"]
+    Buyer["Buyer Web"] --> ProductState
+    ProductState --> Inventory["Inventory"]
+    Inventory --> Reservation["Reservation"]
+    Reservation --> Order["Order"]
+    Order --> Fulfillment["Fulfillment"]
+    Order --> Money["Payment / Earnings"]
+    ProductState --> DB[("PostgreSQL")]
+    Inventory --> DB
+    Order --> DB
+    Money --> DB
+```
+
+A Buyer Web screen never invents a second version of any authoritative state.
+
 # 1. Platform Boundary
 
 ```mermaid
@@ -142,6 +230,24 @@ flowchart TB
   A8["Settings"] --> B8["S80-S81"]
 ```
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Onboarding entry; no server mutation |
+| API | `—` |
+| Primary database state | `—` |
+| Authorization | Public / unauthenticated |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S01"] --> API["—"]
+    API --> AUTH["Public / unauthenticated"]
+    API --> DB["—"]
+```
 ## S01 — Welcome
 ```mermaid
 flowchart TB
@@ -172,8 +278,26 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Persist selected language |
+| API | `PATCH /v1/users/me` |
+| Primary database state | `users, artisan_languages` |
+| Authorization | Authenticated after identity exists |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S02"] --> API["PATCH /v1/users/me"]
+    API --> AUTH["Authenticated after identity exists"]
+    API --> DB["users, artisan_languages"]
+```
 ## S02 — Language
 ```mermaid
 flowchart TB
@@ -204,8 +328,26 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Register or identify phone account |
+| API | `POST /v1/auth/register` |
+| Primary database state | `users, devices` |
+| Authorization | Unauthenticated / registration |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S03"] --> API["POST /v1/auth/register"]
+    API --> AUTH["Unauthenticated / registration"]
+    API --> DB["users, devices"]
+```
 ## S03 — Phone
 ```mermaid
 flowchart TB
@@ -236,8 +378,26 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Create or verify PIN and establish session |
+| API | `POST /v1/auth/register or POST /v1/auth/login` |
+| Primary database state | `users, devices` |
+| Authorization | Unauthenticated / auth boundary |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S04"] --> API["POST /v1/auth/register or POST /v1/auth/login"]
+    API --> AUTH["Unauthenticated / auth boundary"]
+    API --> DB["users, devices"]
+```
 ## S04 — PIN
 ```mermaid
 flowchart TB
@@ -268,8 +428,26 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Save artisan basics and craft selection |
+| API | `PATCH /v1/artisans/me; POST /v1/artisans/me/crafts` |
+| Primary database state | `artisan_profiles, artisan_languages, craft_profiles, craft_skills, artisan_onboarding_progress` |
+| Authorization | Artisan owner |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S05"] --> API["PATCH /v1/artisans/me; POST /v1/artisans/me/crafts"]
+    API --> AUTH["Artisan owner"]
+    API --> DB["artisan_profiles, artisan_languages, craft_profiles, craft_skills, artisan_onboarding_progress"]
+```
 ## S05 — Artisan Basics
 ```mermaid
 flowchart TB
@@ -300,8 +478,26 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Read onboarding completion and enter seller home |
+| API | `GET /v1/artisans/me/onboarding` |
+| Primary database state | `artisan_onboarding_progress, artisan_profiles` |
+| Authorization | Artisan owner |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S06"] --> API["GET /v1/artisans/me/onboarding"]
+    API --> AUTH["Artisan owner"]
+    API --> DB["artisan_onboarding_progress, artisan_profiles"]
+```
 ## S06 — Ready
 ```mermaid
 flowchart TB
@@ -332,8 +528,26 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Load seller dashboard summary |
+| API | `GET /v1/artisans/me; GET /v1/orders?owner=me; GET /v1/earnings/summary; GET /v1/notifications` |
+| Primary database state | `artisan_profiles, orders, order_items, earnings_ledger, notifications, notification_deliveries` |
+| Authorization | Artisan owner |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S10"] --> API["GET /v1/artisans/me; GET /v1/orders?owner=me; GET /v1/earnings/summary; GET /v1/notifications"]
+    API --> AUTH["Artisan owner"]
+    API --> DB["artisan_profiles, orders, order_items, earnings_ledger, notifications, notification_deliveries"]
+```
 ## S10 — Home
 ```mermaid
 flowchart TB
@@ -364,8 +578,26 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Create an AI action proposal from voice |
+| API | `POST /v1/voice/interactions; GET /v1/ai/decisions/{decision_id}; POST /v1/voice/interactions/{interaction_id}/confirm` |
+| Primary database state | `voice_interactions, voice_intents, voice_confirmations, ai_jobs, ai_decisions, ai_corrections` |
+| Authorization | Artisan + sensitive-action confirmation |
+| State authority | AI proposal/job state until explicit confirmation; authoritative commerce state only after domain commit. |
+
+```mermaid
+flowchart LR
+    UI["S20"] --> API["POST /v1/voice/interactions; GET /v1/ai/decisions/{decision_id}; POST /v1/voice/interactions/{interaction_id}/confirm"]
+    API --> AUTH["Artisan + sensitive-action confirmation"]
+    API --> DB["voice_interactions, voice_intents, voice_confirmations, ai_jobs, ai_decisions, ai_corrections"]
+```
 ## S20 — Voice Proposal
 ```mermaid
 flowchart TB
@@ -396,8 +628,26 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Create product draft |
+| API | `POST /v1/products` |
+| Primary database state | `products, product_variants` |
+| Authorization | Artisan owner / scoped Didi session |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S30"] --> API["POST /v1/products"]
+    API --> AUTH["Artisan owner / scoped Didi session"]
+    API --> DB["products, product_variants"]
+```
 ## S30 — Start Product
 ```mermaid
 flowchart TB
@@ -430,6 +680,24 @@ flowchart TB
 
 **Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `/v1/products`. **Primary tables:** `products`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Initialize product media upload |
+| API | `POST /v1/products/{product_id}/media/upload-init` |
+| Primary database state | `product_media` |
+| Authorization | Artisan owner / scoped Didi session |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S31"] --> API["POST /v1/products/{product_id}/media/upload-init"]
+    API --> AUTH["Artisan owner / scoped Didi session"]
+    API --> DB["product_media"]
+```
 ## S31 — Camera Guidance
 ```mermaid
 flowchart TB
@@ -462,6 +730,24 @@ flowchart TB
 
 **Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `/v1/products/{product_id}/media/upload-init`. **Primary tables:** `product_media, media_processing_jobs`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Finalize or read captured media |
+| API | `POST /v1/products/{product_id}/media/{media_id}/finalize; GET /v1/products/{product_id}/media` |
+| Primary database state | `product_media, media_processing_jobs` |
+| Authorization | Artisan owner |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S32"] --> API["POST /v1/products/{product_id}/media/{media_id}/finalize; GET /v1/products/{product_id}/media"]
+    API --> AUTH["Artisan owner"]
+    API --> DB["product_media, media_processing_jobs"]
+```
 ## S32 — Photo Review
 ```mermaid
 flowchart TB
@@ -492,8 +778,26 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Submit voice description |
+| API | `POST /v1/voice/interactions` |
+| Primary database state | `voice_interactions, ai_jobs` |
+| Authorization | Artisan / scoped Didi session |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S33"] --> API["POST /v1/voice/interactions"]
+    API --> AUTH["Artisan / scoped Didi session"]
+    API --> DB["voice_interactions, ai_jobs"]
+```
 ## S33 — Voice Description
 ```mermaid
 flowchart TB
@@ -526,6 +830,24 @@ flowchart TB
 
 **Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `/v1/voice/interactions`. **Primary tables:** `voice_interactions`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Show structured AI extraction for confirmation |
+| API | `GET /v1/voice/interactions/{interaction_id}; GET /v1/ai/decisions/{decision_id}` |
+| Primary database state | `voice_intents, ai_jobs, ai_decisions, product_field_sources` |
+| Authorization | Artisan confirmation required before authoritative commit |
+| State authority | AI proposal/job state until explicit confirmation; authoritative commerce state only after domain commit. |
+
+```mermaid
+flowchart LR
+    UI["S34"] --> API["GET /v1/voice/interactions/{interaction_id}; GET /v1/ai/decisions/{decision_id}"]
+    API --> AUTH["Artisan confirmation required before authoritative commit"]
+    API --> DB["voice_intents, ai_jobs, ai_decisions, product_field_sources"]
+```
 ## S34 — Extracted Facts
 ```mermaid
 flowchart TB
@@ -558,6 +880,24 @@ flowchart TB
 
 **Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `/v1/ai/decisions/{decision_id}`. **Primary tables:** `ai_decisions, product_field_sources`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Run safe image enhancement and compare result |
+| API | `POST /v1/products/{product_id}/media/{media_id}/enhance` |
+| Primary database state | `media_processing_jobs, media_derivatives, media_quality_checks, product_media` |
+| Authorization | Artisan owner |
+| State authority | AI proposal/job state until explicit confirmation; authoritative commerce state only after domain commit. |
+
+```mermaid
+flowchart LR
+    UI["S35"] --> API["POST /v1/products/{product_id}/media/{media_id}/enhance"]
+    API --> AUTH["Artisan owner"]
+    API --> DB["media_processing_jobs, media_derivatives, media_quality_checks, product_media"]
+```
 ## S35 — Image Studio
 ```mermaid
 flowchart TB
@@ -590,6 +930,24 @@ flowchart TB
 
 **Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `/v1/products/{product_id}/media/{media_id}/enhance`. **Primary tables:** `media_derivatives, media_quality_checks`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Generate and review localized catalog draft |
+| API | `POST /v1/products/{product_id}/catalog/generate; GET /v1/products/{product_id}/catalog; PATCH /v1/products/{product_id}/catalog/{catalog_entry_id}` |
+| Primary database state | `catalog_entries, catalog_entry_versions, product_field_sources, languages` |
+| Authorization | Artisan owner |
+| State authority | AI proposal/job state until explicit confirmation; authoritative commerce state only after domain commit. |
+
+```mermaid
+flowchart LR
+    UI["S36"] --> API["POST /v1/products/{product_id}/catalog/generate; GET /v1/products/{product_id}/catalog; PATCH /v1/products/{product_id}/catalog/{catalog_entry_id}"]
+    API --> AUTH["Artisan owner"]
+    API --> DB["catalog_entries, catalog_entry_versions, product_field_sources, languages"]
+```
 ## S36 — Catalog Draft
 ```mermaid
 flowchart TB
@@ -622,6 +980,24 @@ flowchart TB
 
 **Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `/v1/products/{product_id}/catalog/generate`. **Primary tables:** `catalog_entries, catalog_entry_versions`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Request transparent price recommendation |
+| API | `POST /v1/products/{product_id}/pricing/recommend; GET /v1/products/{product_id}/pricing/recommendations/{recommendation_id}` |
+| Primary database state | `pricing_runs, pricing_factors, price_recommendations, product_costs, labour_rate_profiles, market_comparables` |
+| Authorization | Artisan owner |
+| State authority | AI proposal/job state until explicit confirmation; authoritative commerce state only after domain commit. |
+
+```mermaid
+flowchart LR
+    UI["S37"] --> API["POST /v1/products/{product_id}/pricing/recommend; GET /v1/products/{product_id}/pricing/recommendations/{recommendation_id}"]
+    API --> AUTH["Artisan owner"]
+    API --> DB["pricing_runs, pricing_factors, price_recommendations, product_costs, labour_rate_profiles, market_comparables"]
+```
 ## S37 — Price Advisor
 ```mermaid
 flowchart TB
@@ -654,6 +1030,24 @@ flowchart TB
 
 **Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `/v1/products/{product_id}/pricing/recommend`. **Primary tables:** `pricing_runs, pricing_factors, price_recommendations, market_comparables`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Confirm final product data and price override if needed |
+| API | `POST /v1/products/{product_id}/catalog/{catalog_entry_id}/confirm; POST /v1/products/{product_id}/pricing/overrides` |
+| Primary database state | `catalog_entries, catalog_entry_versions, price_recommendations, pricing_overrides, ai_decisions` |
+| Authorization | Artisan explicit confirmation |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S38"] --> API["POST /v1/products/{product_id}/catalog/{catalog_entry_id}/confirm; POST /v1/products/{product_id}/pricing/overrides"]
+    API --> AUTH["Artisan explicit confirmation"]
+    API --> DB["catalog_entries, catalog_entry_versions, price_recommendations, pricing_overrides, ai_decisions"]
+```
 ## S38 — Final Confirmation
 ```mermaid
 flowchart TB
@@ -686,6 +1080,24 @@ flowchart TB
 
 **Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `/v1/voice/interactions/{interaction_id}/confirm`. **Primary tables:** `ai_decisions, catalog_entry_versions`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Publish product to seller storefront and create authoritative sellable state |
+| API | `POST /v1/products/{product_id}/catalog/{catalog_entry_id}/publish; PATCH /v1/storefronts/me; POST /v1/share-links` |
+| Primary database state | `catalog_publications, catalog_publication_events, storefronts, storefront_sections, share_links, products, product_variants, inventory` |
+| Authorization | Artisan explicit confirmation |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S39"] --> API["POST /v1/products/{product_id}/catalog/{catalog_entry_id}/publish; PATCH /v1/storefronts/me; POST /v1/share-links"]
+    API --> AUTH["Artisan explicit confirmation"]
+    API --> DB["catalog_publications, catalog_publication_events, storefronts, storefront_sections, share_links, products, product_variants, inventory"]
+```
 ## S39 — Publish Result
 ```mermaid
 flowchart TB
@@ -718,6 +1130,24 @@ flowchart TB
 
 **Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `/v1/products/{product_id}/catalog/{catalog_entry_id}/publish`. **Primary tables:** `catalog_publications, market_readiness`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Read product, variants, media, catalog and inventory |
+| API | `GET /v1/products/{product_id}; GET /v1/products/{product_id}/variants/{variant_id}; GET /v1/products/{product_id}/media; GET /v1/products/{product_id}/catalog` |
+| Primary database state | `products, product_variants, product_media, catalog_entries, inventory` |
+| Authorization | Artisan owner |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S40"] --> API["GET /v1/products/{product_id}; GET /v1/products/{product_id}/variants/{variant_id}; GET /v1/products/{product_id}/media; GET /v1/products/{product_id}/catalog"]
+    API --> AUTH["Artisan owner"]
+    API --> DB["products, product_variants, product_media, catalog_entries, inventory"]
+```
 ## S40 — Product Detail
 ```mermaid
 flowchart TB
@@ -748,8 +1178,26 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Edit product or variant fields with optimistic revision |
+| API | `PATCH /v1/products/{product_id}; PATCH /v1/products/{product_id}/variants/{variant_id}` |
+| Primary database state | `products, product_variants, product_field_sources, audit_events` |
+| Authorization | Artisan owner / confirmation for consequential fields |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S41"] --> API["PATCH /v1/products/{product_id}; PATCH /v1/products/{product_id}/variants/{variant_id}"]
+    API --> AUTH["Artisan owner / confirmation for consequential fields"]
+    API --> DB["products, product_variants, product_field_sources, audit_events"]
+```
 ## S41 — Product Edit
 ```mermaid
 flowchart TB
@@ -780,8 +1228,26 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P1. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+**Entry:** contextual seller navigation or prior screen. **Priority:** P1. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | List draft products and continue local/server work |
+| API | `GET /v1/products?status=draft` |
+| Primary database state | `products, product_variants, product_media, ai_jobs` |
+| Authorization | Artisan owner |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S42"] --> API["GET /v1/products?status=draft"]
+    API --> AUTH["Artisan owner"]
+    API --> DB["products, product_variants, product_media, ai_jobs"]
+```
 ## S42 — Drafts
 ```mermaid
 flowchart TB
@@ -812,8 +1278,26 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | List seller orders needing action |
+| API | `GET /v1/orders?owner=me` |
+| Primary database state | `orders, order_items, customers, fulfillments, fulfilment_events` |
+| Authorization | Artisan owner |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S50"] --> API["GET /v1/orders?owner=me"]
+    API --> AUTH["Artisan owner"]
+    API --> DB["orders, order_items, customers, fulfillments, fulfilment_events"]
+```
 ## S50 — Order Inbox
 ```mermaid
 flowchart TB
@@ -846,6 +1330,24 @@ flowchart TB
 
 **Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `/v1/orders?owner=me`. **Primary tables:** `orders, order_items`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Read order lifecycle, fulfillment and payment state |
+| API | `GET /v1/orders/{order_id}; GET /v1/orders/{order_id}/fulfillment; GET /v1/orders/{order_id}/payment` |
+| Primary database state | `orders, order_items, order_addresses, fulfillments, fulfilment_events, payment_records` |
+| Authorization | Artisan owner |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S51"] --> API["GET /v1/orders/{order_id}; GET /v1/orders/{order_id}/fulfillment; GET /v1/orders/{order_id}/payment"]
+    API --> AUTH["Artisan owner"]
+    API --> DB["orders, order_items, order_addresses, fulfillments, fulfilment_events, payment_records"]
+```
 ## S51 — Order Detail
 ```mermaid
 flowchart TB
@@ -878,6 +1380,24 @@ flowchart TB
 
 **Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `/v1/orders/{order_id}`. **Primary tables:** `orders, order_items, order_addresses`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Move order through preparation/shipping and record fulfillment events |
+| API | `POST /v1/orders/{order_id}/prepare; POST /v1/orders/{order_id}/ship; POST /v1/orders/{order_id}/fulfillment/events` |
+| Primary database state | `orders, fulfillments, fulfilment_events, inventory_movements, notifications` |
+| Authorization | Artisan owner |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S52"] --> API["POST /v1/orders/{order_id}/prepare; POST /v1/orders/{order_id}/ship; POST /v1/orders/{order_id}/fulfillment/events"]
+    API --> AUTH["Artisan owner"]
+    API --> DB["orders, fulfillments, fulfilment_events, inventory_movements, notifications"]
+```
 ## S52 — Fulfilment
 ```mermaid
 flowchart TB
@@ -910,6 +1430,24 @@ flowchart TB
 
 **Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `/v1/orders/{order_id}/fulfillment/events`. **Primary tables:** `fulfillments, fulfilment_events`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Handle cancellation, return and refund exception |
+| API | `POST /v1/orders/{order_id}/cancel; POST /v1/orders/{order_id}/return-requests; POST /v1/orders/{order_id}/refunds` |
+| Primary database state | `orders, fulfillments, payment_records, audit_events` |
+| Authorization | Artisan/customer rules + consequential confirmation |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S53"] --> API["POST /v1/orders/{order_id}/cancel; POST /v1/orders/{order_id}/return-requests; POST /v1/orders/{order_id}/refunds"]
+    API --> AUTH["Artisan/customer rules + consequential confirmation"]
+    API --> DB["orders, fulfillments, payment_records, audit_events"]
+```
 ## S53 — Order Exception
 ```mermaid
 flowchart TB
@@ -942,6 +1480,24 @@ flowchart TB
 
 **Entry:** contextual seller navigation or prior screen. **Priority:** P1. **Primary API:** `/v1/orders/{order_id}/cancel or return-requests or refunds`. **Primary tables:** `orders, payment_records, fulfillments`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Load earnings summary |
+| API | `GET /v1/earnings/summary` |
+| Primary database state | `earnings_ledger, payment_records, payout_records` |
+| Authorization | Artisan owner |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S60"] --> API["GET /v1/earnings/summary"]
+    API --> AUTH["Artisan owner"]
+    API --> DB["earnings_ledger, payment_records, payout_records"]
+```
 ## S60 — My Money
 ```mermaid
 flowchart TB
@@ -974,6 +1530,24 @@ flowchart TB
 
 **Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `/v1/earnings/summary`. **Primary tables:** `earnings_ledger, payment_records`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Read earnings ledger and payout state |
+| API | `GET /v1/earnings/ledger; GET /v1/payouts; GET /v1/payout-accounts` |
+| Primary database state | `earnings_ledger, payout_accounts, payout_records, payment_records` |
+| Authorization | Artisan owner; payout mutations additionally protected |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S61"] --> API["GET /v1/earnings/ledger; GET /v1/payouts; GET /v1/payout-accounts"]
+    API --> AUTH["Artisan owner; payout mutations additionally protected"]
+    API --> DB["earnings_ledger, payout_accounts, payout_records, payment_records"]
+```
 ## S61 — Earnings Detail
 ```mermaid
 flowchart TB
@@ -1006,6 +1580,24 @@ flowchart TB
 
 **Entry:** contextual seller navigation or prior screen. **Priority:** P1. **Primary API:** `/v1/earnings/ledger`. **Primary tables:** `earnings_ledger, payout_records`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Show local/offline state; no server write until sync |
+| API | `GET /v1/sync/status when connected; local SQLite/Drift state offline` |
+| Primary database state | `sync_queue_items, devices` |
+| Authorization | Authenticated device + local offline state |
+| State authority | Local draft / sync state until server acknowledgement; conflicts remain server-authoritative. |
+
+```mermaid
+flowchart LR
+    UI["S70"] --> API["GET /v1/sync/status when connected; local SQLite/Drift state offline"]
+    API --> AUTH["Authenticated device + local offline state"]
+    API --> DB["sync_queue_items, devices"]
+```
 ## S70 — Offline State
 ```mermaid
 flowchart TB
@@ -1038,6 +1630,24 @@ flowchart TB
 
 **Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `/v1/sync/status`. **Primary tables:** `sync_queue_items, devices`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Read sync cursor/status and queued work |
+| API | `GET /v1/sync/status; GET /v1/sync/pull?cursor=<cursor>` |
+| Primary database state | `sync_queue_items, sync_conflicts` |
+| Authorization | Authenticated device |
+| State authority | Local draft / sync state until server acknowledgement; conflicts remain server-authoritative. |
+
+```mermaid
+flowchart LR
+    UI["S71"] --> API["GET /v1/sync/status; GET /v1/sync/pull?cursor=<cursor>"]
+    API --> AUTH["Authenticated device"]
+    API --> DB["sync_queue_items, sync_conflicts"]
+```
 ## S71 — Sync Status
 ```mermaid
 flowchart TB
@@ -1070,6 +1680,24 @@ flowchart TB
 
 **Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `/v1/sync/status and /v1/sync/pull`. **Primary tables:** `sync_queue_items, sync_conflicts`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Compare and resolve server/client conflict |
+| API | `GET /v1/conflicts/{conflict_id}; GET /v1/conflicts/{conflict_id}/comparison; POST /v1/conflicts/{conflict_id}/resolve` |
+| Primary database state | `sync_conflicts, sync_conflict_resolutions, target entity table, audit_events` |
+| Authorization | Authenticated actor + resource scope |
+| State authority | Server conflict record + explicit resolution result. |
+
+```mermaid
+flowchart LR
+    UI["S72"] --> API["GET /v1/conflicts/{conflict_id}; GET /v1/conflicts/{conflict_id}/comparison; POST /v1/conflicts/{conflict_id}/resolve"]
+    API --> AUTH["Authenticated actor + resource scope"]
+    API --> DB["sync_conflicts, sync_conflict_resolutions, target entity table, audit_events"]
+```
 ## S72 — Conflict Review
 ```mermaid
 flowchart TB
@@ -1102,6 +1730,24 @@ flowchart TB
 
 **Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `/v1/conflicts/{conflict_id}/comparison and /resolve`. **Primary tables:** `sync_conflicts, sync_conflict_resolutions`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Load assigned-artisan assistance workload |
+| API | `GET /v1/assistance-sessions; GET /v1/admin/clusters/{cluster_id}/artisans` |
+| Primary database state | `assistance_sessions, assistance_session_actions, artisan_profiles, clusters` |
+| Authorization | CRP/Didi RBAC + organization/cluster scope |
+| State authority | Server-authoritative assisted-commerce state scoped by active assistance session. |
+
+```mermaid
+flowchart LR
+    UI["D01"] --> API["GET /v1/assistance-sessions; GET /v1/admin/clusters/{cluster_id}/artisans"]
+    API --> AUTH["CRP/Didi RBAC + organization/cluster scope"]
+    API --> DB["assistance_sessions, assistance_session_actions, artisan_profiles, clusters"]
+```
 ## D01 — Didi Home
 ```mermaid
 flowchart TB
@@ -1132,8 +1778,26 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Browse artisans assigned to the CRP |
+| API | `GET /v1/admin/clusters/{cluster_id}/artisans` |
+| Primary database state | `artisan_profiles, clusters, artisan_onboarding_progress` |
+| Authorization | CRP/Didi scope |
+| State authority | Server-authoritative assisted-commerce state scoped by active assistance session. |
+
+```mermaid
+flowchart LR
+    UI["D02"] --> API["GET /v1/admin/clusters/{cluster_id}/artisans"]
+    API --> AUTH["CRP/Didi scope"]
+    API --> DB["artisan_profiles, clusters, artisan_onboarding_progress"]
+```
 ## D02 — Artisan List
 ```mermaid
 flowchart TB
@@ -1164,8 +1828,26 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Start a scoped assistance session |
+| API | `POST /v1/assistance-sessions` |
+| Primary database state | `assistance_sessions, assistance_session_actions, audit_events` |
+| Authorization | CRP/Didi + assigned artisan + requested scope |
+| State authority | Server-authoritative assisted-commerce state scoped by active assistance session. |
+
+```mermaid
+flowchart LR
+    UI["D03"] --> API["POST /v1/assistance-sessions"]
+    API --> AUTH["CRP/Didi + assigned artisan + requested scope"]
+    API --> DB["assistance_sessions, assistance_session_actions, audit_events"]
+```
 ## D03 — Assistance Session Setup
 ```mermaid
 flowchart TB
@@ -1196,8 +1878,26 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Perform scoped assistance actions |
+| API | `GET /v1/assistance-sessions/{session_id}; POST /v1/assistance-sessions/{session_id}/actions; POST /v1/assistance-sessions/{session_id}/close` |
+| Primary database state | `assistance_sessions, assistance_session_actions, audit_events, affected business tables` |
+| Authorization | Active assistance session; sensitive actions require artisan confirmation |
+| State authority | Server-authoritative assisted-commerce state scoped by active assistance session. |
+
+```mermaid
+flowchart LR
+    UI["D04"] --> API["GET /v1/assistance-sessions/{session_id}; POST /v1/assistance-sessions/{session_id}/actions; POST /v1/assistance-sessions/{session_id}/close"]
+    API --> AUTH["Active assistance session; sensitive actions require artisan confirmation"]
+    API --> DB["assistance_sessions, assistance_session_actions, audit_events, affected business tables"]
+```
 ## D04 — Active Assistance Session
 ```mermaid
 flowchart TB
@@ -1228,8 +1928,26 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+**Entry:** contextual seller navigation or prior screen. **Priority:** P0. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Review prior assistance sessions |
+| API | `GET /v1/assistance-sessions` |
+| Primary database state | `assistance_sessions, assistance_session_actions, audit_events` |
+| Authorization | CRP/Didi scoped history |
+| State authority | Server-authoritative assisted-commerce state scoped by active assistance session. |
+
+```mermaid
+flowchart LR
+    UI["D05"] --> API["GET /v1/assistance-sessions"]
+    API --> AUTH["CRP/Didi scoped history"]
+    API --> DB["assistance_sessions, assistance_session_actions, audit_events"]
+```
 ## D05 — Assistance History
 ```mermaid
 flowchart TB
@@ -1260,8 +1978,26 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P1. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+**Entry:** contextual seller navigation or prior screen. **Priority:** P1. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Read/update seller profile and language preferences |
+| API | `GET /v1/users/me; PATCH /v1/users/me; GET /v1/artisans/me; PATCH /v1/artisans/me` |
+| Primary database state | `users, artisan_profiles, artisan_languages, verifications` |
+| Authorization | Artisan owner |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S80"] --> API["GET /v1/users/me; PATCH /v1/users/me; GET /v1/artisans/me; PATCH /v1/artisans/me"]
+    API --> AUTH["Artisan owner"]
+    API --> DB["users, artisan_profiles, artisan_languages, verifications"]
+```
 ## S80 — Profile
 ```mermaid
 flowchart TB
@@ -1292,8 +2028,26 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P1. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+**Entry:** contextual seller navigation or prior screen. **Priority:** P1. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Manage export/deletion/privacy choices |
+| API | `POST /v1/data-rights/export; GET /v1/data-rights/export/{request_id}; POST /v1/data-rights/deletion` |
+| Primary database state | `data_export_requests, data_deletion_requests, audit_events, governed business data` |
+| Authorization | Artisan owner; destructive requests audited |
+| State authority | Server-authoritative state unless the screen is explicitly an onboarding/local-draft screen. |
+
+```mermaid
+flowchart LR
+    UI["S81"] --> API["POST /v1/data-rights/export; GET /v1/data-rights/export/{request_id}; POST /v1/data-rights/deletion"]
+    API --> AUTH["Artisan owner; destructive requests audited"]
+    API --> DB["data_export_requests, data_deletion_requests, audit_events, governed business data"]
+```
 ## S81 — Data & Privacy
 ```mermaid
 flowchart TB
@@ -1324,7 +2078,25 @@ flowchart TB
   class NAV nav
 ```
 
-**Entry:** contextual seller navigation or prior screen. **Priority:** P1. **Primary API:** `See API contract for the supporting route group`. **Primary tables:** `See database coverage`.
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Manage export/deletion/privacy choices |
+| API | `POST /v1/data-rights/export; GET /v1/data-rights/export/{request_id}; POST /v1/data-rights/deletion` |
+| Primary database state | `data_export_requests, data_deletion_requests, audit_events, governed business data` |
+| Authorization | Artisan owner; destructive requests audited |
+| State authority | Server-authoritative transactional state. |
+
+```mermaid
+flowchart LR
+    UI["S81"] --> API["POST /v1/data-rights/export; GET /v1/data-rights/export/{request_id}; POST /v1/data-rights/deletion"]
+    API --> AUTH["Artisan owner; destructive requests audited"]
+    API --> DB["data_export_requests, data_deletion_requests, audit_events, governed business data"]
+```
+
+
+**Entry:** contextual seller navigation or prior screen. **Priority:** P1. **Implementation linkage:** See the screen-level API/DB contract immediately below each visual wireframe.
 
 ## 4.2 Seller onboarding journey
 ```mermaid
@@ -1504,6 +2276,24 @@ flowchart LR
   A11["B10"] --> B11["B70 Account"]
 ```
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Discover public catalog landing content |
+| API | `POST /v1/buyer/session; GET /v1/discovery/products` |
+| Primary database state | `buyer_sessions, customers, catalog_entries, catalog_publications, products, product_media` |
+| Authorization | Public / buyer session |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["B10"] --> API["POST /v1/buyer/session; GET /v1/discovery/products"]
+    API --> AUTH["Public / buyer session"]
+    API --> DB["buyer_sessions, customers, catalog_entries, catalog_publications, products, product_media"]
+```
 ## B10 — B2C Home
 ```mermaid
 flowchart TB
@@ -1536,6 +2326,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/discovery/products`. **Primary tables:** `catalog_entries, catalog_publications, products`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Search and paginate public product catalog |
+| API | `GET /v1/discovery/products` |
+| Primary database state | `catalog_entries, catalog_publications, products, product_variants, craft_categories, languages` |
+| Authorization | Public / buyer session |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["B20"] --> API["GET /v1/discovery/products"]
+    API --> AUTH["Public / buyer session"]
+    API --> DB["catalog_entries, catalog_publications, products, product_variants, craft_categories, languages"]
+```
 ## B20 — Search Results
 ```mermaid
 flowchart TB
@@ -1568,6 +2376,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/discovery/products`. **Primary tables:** `catalog_entries, products, inventory`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Apply discovery filters and update search query |
+| API | `GET /v1/discovery/products` |
+| Primary database state | `catalog_entries, products, product_variants, craft_categories, craft_profiles` |
+| Authorization | Public / buyer session |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["B21"] --> API["GET /v1/discovery/products"]
+    API --> AUTH["Public / buyer session"]
+    API --> DB["catalog_entries, products, product_variants, craft_categories, craft_profiles"]
+```
 ## B21 — Filters
 ```mermaid
 flowchart TB
@@ -1600,6 +2426,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/discovery/products`. **Primary tables:** `catalog_entries, products`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Read public product detail and related products |
+| API | `GET /v1/public/products/{product_id}; GET /v1/public/products/{product_id}/related` |
+| Primary database state | `products, product_variants, product_media, catalog_entries, production_stories, craft_provenance_records, inventory` |
+| Authorization | Public / buyer session |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["B30"] --> API["GET /v1/public/products/{product_id}; GET /v1/public/products/{product_id}/related"]
+    API --> AUTH["Public / buyer session"]
+    API --> DB["products, product_variants, product_media, catalog_entries, production_stories, craft_provenance_records, inventory"]
+```
 ## B30 — Product Detail
 ```mermaid
 flowchart TB
@@ -1632,6 +2476,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/public/products/{product_id} and /v1/carts/{cart_id}/items`. **Primary tables:** `products, product_variants, inventory`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Read production/craft story content |
+| API | `GET /v1/public/products/{product_id}; public story data within product response` |
+| Primary database state | `production_stories, craft_provenance_records, product_field_sources` |
+| Authorization | Public |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["B31"] --> API["GET /v1/public/products/{product_id}; public story data within product response"]
+    API --> AUTH["Public"]
+    API --> DB["production_stories, craft_provenance_records, product_field_sources"]
+```
 ## B31 — Craft Story
 ```mermaid
 flowchart TB
@@ -1664,6 +2526,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/products/{product_id}/stories`. **Primary tables:** `production_stories, craft_provenance_records`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Read artisan public profile and trust signals |
+| API | `GET /v1/public/artisans/{artisan_id}` |
+| Primary database state | `artisan_profiles, craft_profiles, craft_skills, verifications, craft_provenance_records` |
+| Authorization | Public |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["B32"] --> API["GET /v1/public/artisans/{artisan_id}"]
+    API --> AUTH["Public"]
+    API --> DB["artisan_profiles, craft_profiles, craft_skills, verifications, craft_provenance_records"]
+```
 ## B32 — Artisan Profile
 ```mermaid
 flowchart TB
@@ -1696,6 +2576,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/public/artisans/{artisan_id}`. **Primary tables:** `artisan_profiles, craft_profiles, verifications`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Load and mutate current cart |
+| API | `GET /v1/carts/current; POST /v1/carts/{cart_id}/items; PATCH /v1/carts/{cart_id}/items/{cart_item_id}; DELETE /v1/carts/{cart_id}/items/{cart_item_id}` |
+| Primary database state | `buyer_sessions, carts, cart_items, product_variants, inventory` |
+| Authorization | Buyer session / cart owner |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["B40"] --> API["GET /v1/carts/current; POST /v1/carts/{cart_id}/items; PATCH /v1/carts/{cart_id}/items/{cart_item_id}; DELETE /v1/carts/{cart_id}/items/{cart_item_id}"]
+    API --> AUTH["Buyer session / cart owner"]
+    API --> DB["buyer_sessions, carts, cart_items, product_variants, inventory"]
+```
 ## B40 — Cart
 ```mermaid
 flowchart TB
@@ -1728,6 +2626,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/carts/current`. **Primary tables:** `buyer_sessions, carts, cart_items`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Validate checkout before committing |
+| API | `POST /v1/checkout/validate` |
+| Primary database state | `carts, cart_items, inventory, inventory_reservations, products, product_variants` |
+| Authorization | Buyer session / cart owner |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["B50"] --> API["POST /v1/checkout/validate"]
+    API --> AUTH["Buyer session / cart owner"]
+    API --> DB["carts, cart_items, inventory, inventory_reservations, products, product_variants"]
+```
 ## B50 — Checkout
 ```mermaid
 flowchart TB
@@ -1760,6 +2676,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/checkout/validate and /v1/checkout/orders`. **Primary tables:** `orders, order_items, order_addresses, payment_records, inventory_reservations`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Capture or select delivery address for checkout |
+| API | `POST /v1/checkout/validate; POST /v1/checkout/orders` |
+| Primary database state | `customers, order_addresses, carts, cart_items` |
+| Authorization | Buyer session / customer |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["B51"] --> API["POST /v1/checkout/validate; POST /v1/checkout/orders"]
+    API --> AUTH["Buyer session / customer"]
+    API --> DB["customers, order_addresses, carts, cart_items"]
+```
 ## B51 — Address
 ```mermaid
 flowchart TB
@@ -1792,6 +2726,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/checkout/validate`. **Primary tables:** `order_addresses`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Create authoritative B2C order from validated cart |
+| API | `POST /v1/checkout/orders` |
+| Primary database state | `orders, order_items, order_addresses, inventory_reservations, inventory_movements, payment_records, customers` |
+| Authorization | Buyer session; deterministic checkout transaction |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["B52"] --> API["POST /v1/checkout/orders"]
+    API --> AUTH["Buyer session; deterministic checkout transaction"]
+    API --> DB["orders, order_items, order_addresses, inventory_reservations, inventory_movements, payment_records, customers"]
+```
 ## B52 — Order Confirmation
 ```mermaid
 flowchart TB
@@ -1824,6 +2776,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/orders/{order_id}`. **Primary tables:** `orders, fulfillments, payment_records`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Read buyer-facing order and fulfillment tracking |
+| API | `GET /v1/buyer/orders/{id}; GET /v1/orders/{order_id}/fulfillment; GET /v1/orders/{order_id}/fulfillment/events` |
+| Primary database state | `orders, order_items, fulfillments, fulfilment_events, payment_records` |
+| Authorization | Buyer owns/read scope |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["B60"] --> API["GET /v1/buyer/orders/{id}; GET /v1/orders/{order_id}/fulfillment; GET /v1/orders/{order_id}/fulfillment/events"]
+    API --> AUTH["Buyer owns/read scope"]
+    API --> DB["orders, order_items, fulfillments, fulfilment_events, payment_records"]
+```
 ## B60 — Order Tracking
 ```mermaid
 flowchart TB
@@ -1856,6 +2826,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/orders/{order_id}/fulfillment`. **Primary tables:** `orders, fulfillments, fulfilment_events`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | List buyer order history |
+| API | `GET /v1/buyer/orders` |
+| Primary database state | `orders, order_items, fulfillments` |
+| Authorization | Buyer customer scope |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["B61"] --> API["GET /v1/buyer/orders"]
+    API --> AUTH["Buyer customer scope"]
+    API --> DB["orders, order_items, fulfillments"]
+```
 ## B61 — Order History
 ```mermaid
 flowchart TB
@@ -1888,6 +2876,24 @@ flowchart TB
 
 **Priority:** P1. **Primary API:** `/v1/orders?mine=true`. **Primary tables:** `orders, fulfillments`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Read buyer account/session |
+| API | `GET /v1/buyer/session; POST /v1/buyer/session/logout` |
+| Primary database state | `buyer_sessions, customers` |
+| Authorization | Buyer session |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["B70"] --> API["GET /v1/buyer/session; POST /v1/buyer/session/logout"]
+    API --> AUTH["Buyer session"]
+    API --> DB["buyer_sessions, customers"]
+```
 ## B70 — Account
 ```mermaid
 flowchart TB
@@ -1918,7 +2924,25 @@ flowchart TB
   class NAV nav
 ```
 
-**Priority:** P1. **Primary API:** `/v1/buyer/session and /v1/users/me`. **Primary tables:** `customers, buyer_sessions, users`.
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Read buyer account and session controls |
+| API | `GET /v1/buyer/session; POST /v1/buyer/session/logout` |
+| Primary database state | `buyer_sessions, customers, users` |
+| Authorization | Buyer session |
+| State authority | Server-authoritative transactional state. |
+
+```mermaid
+flowchart LR
+    UI["B70"] --> API["GET /v1/buyer/session; POST /v1/buyer/session/logout"]
+    API --> AUTH["Buyer session"]
+    API --> DB["buyer_sessions, customers, users"]
+```
+
+
+**Priority:** P1. **Implementation linkage:** See the screen-level API/DB contract immediately below the visual wireframe.
 
 ## 6.1 B2C checkout transaction
 ```mermaid
@@ -1960,6 +2984,24 @@ flowchart LR
   A10["BB40 Quotation"] --> B10["BB50 Converted Order"]
 ```
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Load buyer B2B dashboard |
+| API | `GET /v1/b2b/requirements?mine=true` |
+| Primary database state | `customers, buyer_requirements, market_opportunities, market_matches, quotations` |
+| Authorization | B2B buyer session |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["BB10"] --> API["GET /v1/b2b/requirements?mine=true"]
+    API --> AUTH["B2B buyer session"]
+    API --> DB["customers, buyer_requirements, market_opportunities, market_matches, quotations"]
+```
 ## BB10 — B2B Home
 ```mermaid
 flowchart TB
@@ -1992,6 +3034,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/b2b/requirements?mine=true`. **Primary tables:** `buyer_requirements, quotations`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Create B2B requirement draft |
+| API | `POST /v1/b2b/requirements` |
+| Primary database state | `buyer_requirements, buyer_requirement_items` |
+| Authorization | B2B buyer |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["BB20"] --> API["POST /v1/b2b/requirements"]
+    API --> AUTH["B2B buyer"]
+    API --> DB["buyer_requirements, buyer_requirement_items"]
+```
 ## BB20 — Requirement Step 1
 ```mermaid
 flowchart TB
@@ -2024,6 +3084,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/b2b/requirements`. **Primary tables:** `buyer_requirements, buyer_requirement_items`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Add craft/material/quantity/budget requirement attributes |
+| API | `PATCH /v1/b2b/requirements/{requirement_id}` |
+| Primary database state | `buyer_requirements, buyer_requirement_items` |
+| Authorization | B2B buyer |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["BB21"] --> API["PATCH /v1/b2b/requirements/{requirement_id}"]
+    API --> AUTH["B2B buyer"]
+    API --> DB["buyer_requirements, buyer_requirement_items"]
+```
 ## BB21 — Requirement Step 2
 ```mermaid
 flowchart TB
@@ -2056,6 +3134,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/b2b/requirements/{id}`. **Primary tables:** `buyer_requirements, buyer_requirement_items`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Add deadline/location and finalize requirement fields |
+| API | `PATCH /v1/b2b/requirements/{requirement_id}` |
+| Primary database state | `buyer_requirements, buyer_requirement_items` |
+| Authorization | B2B buyer |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["BB22"] --> API["PATCH /v1/b2b/requirements/{requirement_id}"]
+    API --> AUTH["B2B buyer"]
+    API --> DB["buyer_requirements, buyer_requirement_items"]
+```
 ## BB22 — Requirement Step 3
 ```mermaid
 flowchart TB
@@ -2088,6 +3184,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/b2b/requirements/{id}`. **Primary tables:** `buyer_requirements`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Review and publish requirement |
+| API | `POST /v1/b2b/requirements/{requirement_id}/publish` |
+| Primary database state | `buyer_requirements, buyer_requirement_items, market_opportunities` |
+| Authorization | B2B buyer explicit submit |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["BB23"] --> API["POST /v1/b2b/requirements/{requirement_id}/publish"]
+    API --> AUTH["B2B buyer explicit submit"]
+    API --> DB["buyer_requirements, buyer_requirement_items, market_opportunities"]
+```
 ## BB23 — Requirement Review
 ```mermaid
 flowchart TB
@@ -2120,6 +3234,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/b2b/requirements/{id}/publish`. **Primary tables:** `buyer_requirements, buyer_requirement_items`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Generate and read ranked matches |
+| API | `POST /v1/b2b/requirements/{requirement_id}/match; GET /v1/b2b/requirements/{requirement_id}/matches` |
+| Primary database state | `market_opportunities, market_matches, market_match_factors, cluster_capacity_snapshots, artisan_profiles, product_variants` |
+| Authorization | B2B buyer |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["BB30"] --> API["POST /v1/b2b/requirements/{requirement_id}/match; GET /v1/b2b/requirements/{requirement_id}/matches"]
+    API --> AUTH["B2B buyer"]
+    API --> DB["market_opportunities, market_matches, market_match_factors, cluster_capacity_snapshots, artisan_profiles, product_variants"]
+```
 ## BB30 — Match Results
 ```mermaid
 flowchart TB
@@ -2152,6 +3284,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/b2b/requirements/{id}/matches`. **Primary tables:** `market_opportunities, market_matches, market_match_factors`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Inspect a matched artisan/cluster opportunity |
+| API | `GET /v1/b2b/matches/{match_id}` |
+| Primary database state | `market_matches, market_match_factors, market_opportunities, cluster_capacity_snapshots, artisan_profiles` |
+| Authorization | B2B buyer |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["BB31"] --> API["GET /v1/b2b/matches/{match_id}"]
+    API --> AUTH["B2B buyer"]
+    API --> DB["market_matches, market_match_factors, market_opportunities, cluster_capacity_snapshots, artisan_profiles"]
+```
 ## BB31 — Match Detail
 ```mermaid
 flowchart TB
@@ -2184,6 +3334,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/b2b/matches/{id}`. **Primary tables:** `market_matches, market_match_factors, cluster_capacity_snapshots`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Request a quotation from a match |
+| API | `POST /v1/b2b/matches/{match_id}/quotation-requests` |
+| Primary database state | `market_matches, quotations, quotation_items, buyer_requirements` |
+| Authorization | B2B buyer |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["BB32"] --> API["POST /v1/b2b/matches/{match_id}/quotation-requests"]
+    API --> AUTH["B2B buyer"]
+    API --> DB["market_matches, quotations, quotation_items, buyer_requirements"]
+```
 ## BB32 — Quote Request
 ```mermaid
 flowchart TB
@@ -2216,6 +3384,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/b2b/matches/{id}/quotation-requests`. **Primary tables:** `quotations, quotation_items`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Read quotation detail and negotiation state |
+| API | `GET /v1/b2b/quotations/{quotation_id}; GET /v1/b2b/requirements/{requirement_id}/quotations` |
+| Primary database state | `quotations, quotation_items, buyer_requirements, market_matches` |
+| Authorization | B2B buyer / responding cluster scope |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["BB40"] --> API["GET /v1/b2b/quotations/{quotation_id}; GET /v1/b2b/requirements/{requirement_id}/quotations"]
+    API --> AUTH["B2B buyer / responding cluster scope"]
+    API --> DB["quotations, quotation_items, buyer_requirements, market_matches"]
+```
 ## BB40 — Quotation Detail
 ```mermaid
 flowchart TB
@@ -2248,6 +3434,24 @@ flowchart TB
 
 **Priority:** P0. **Primary API:** `/v1/b2b/quotations/{id}`. **Primary tables:** `quotations, quotation_items`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Compare quotations |
+| API | `GET /v1/b2b/requirements/{requirement_id}/quotations` |
+| Primary database state | `quotations, quotation_items` |
+| Authorization | B2B buyer |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["BB41"] --> API["GET /v1/b2b/requirements/{requirement_id}/quotations"]
+    API --> AUTH["B2B buyer"]
+    API --> DB["quotations, quotation_items"]
+```
 ## BB41 — Quote Comparison
 ```mermaid
 flowchart TB
@@ -2280,6 +3484,24 @@ flowchart TB
 
 **Priority:** P1. **Primary API:** `/v1/b2b/requirements/{id}/quotations`. **Primary tables:** `quotations, quotation_items, market_matches`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Request quotation revision |
+| API | `POST /v1/b2b/quotations/{quotation_id}/revision-request` |
+| Primary database state | `quotations, quotation_items, audit_events` |
+| Authorization | B2B buyer |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["BB42"] --> API["POST /v1/b2b/quotations/{quotation_id}/revision-request"]
+    API --> AUTH["B2B buyer"]
+    API --> DB["quotations, quotation_items, audit_events"]
+```
 ## BB42 — Change Request
 ```mermaid
 flowchart TB
@@ -2312,6 +3534,24 @@ flowchart TB
 
 **Priority:** P1. **Primary API:** `/v1/b2b/quotations/{id}/reject`. **Primary tables:** `quotations, quotation_items`.
 
+
+
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Accept quotation / view converted order |
+| API | `POST /v1/b2b/quotations/{quotation_id}/accept; GET /v1/orders/{order_id}` |
+| Primary database state | `quotations, quotation_items, orders, order_items, inventory_reservations, payment_records` |
+| Authorization | B2B buyer; deterministic conversion |
+| State authority | Public catalog or buyer-owned transactional state; seller operational internals are hidden. |
+
+```mermaid
+flowchart LR
+    UI["BB50"] --> API["POST /v1/b2b/quotations/{quotation_id}/accept; GET /v1/orders/{order_id}"]
+    API --> AUTH["B2B buyer; deterministic conversion"]
+    API --> DB["quotations, quotation_items, orders, order_items, inventory_reservations, payment_records"]
+```
 ## BB50 — Converted Order
 ```mermaid
 flowchart TB
@@ -2342,7 +3582,25 @@ flowchart TB
   class NAV nav
 ```
 
-**Priority:** P1. **Primary API:** `/v1/orders/{id}`. **Primary tables:** `orders, order_items, fulfillments`.
+### Implementation Linkage
+
+| Contract layer | Screen binding |
+|---|---|
+| Screen responsibility | Accept quotation and read converted order |
+| API | `POST /v1/b2b/quotations/{quotation_id}/accept; GET /v1/orders/{order_id}` |
+| Primary database state | `quotations, quotation_items, orders, order_items, fulfillments` |
+| Authorization | B2B buyer; deterministic conversion |
+| State authority | Server-authoritative transactional state. |
+
+```mermaid
+flowchart LR
+    UI["BB50"] --> API["POST /v1/b2b/quotations/{quotation_id}/accept; GET /v1/orders/{order_id}"]
+    API --> AUTH["B2B buyer; deterministic conversion"]
+    API --> DB["quotations, quotation_items, orders, order_items, fulfillments"]
+```
+
+
+**Priority:** P1. **Implementation linkage:** See the screen-level API/DB contract immediately below the visual wireframe.
 
 ## 7.1 B2B quotation state
 ```mermaid
@@ -2775,6 +4033,89 @@ flowchart LR
 ```
 
 ---
+
+# 14. Screen → API → Database Traceability Atlas
+
+## 14.1 Seller Critical Path
+
+```mermaid
+flowchart LR
+    S30["S30 Start Product"] --> P1["POST /v1/products"] --> T1["products + product_variants"]
+    S31["S31 Camera"] --> P2["POST /products/{id}/media/upload-init"] --> T2["product_media"]
+    S33["S33 Voice"] --> P3["POST /v1/voice/interactions"] --> T3["voice_interactions + ai_jobs"]
+    S34["S34 Extracted Facts"] --> P4["GET interaction / AI decision"] --> T4["voice_intents + ai_decisions + field_sources"]
+    S35["S35 Image Studio"] --> P5["POST media/{id}/enhance"] --> T5["media_derivatives + quality_checks"]
+    S36["S36 Catalog"] --> P6["POST catalog/generate"] --> T6["catalog_entries + versions"]
+    S37["S37 Price"] --> P7["POST pricing/recommend"] --> T7["pricing_runs + factors + recommendation"]
+    S38["S38 Confirm"] --> P8["confirm + pricing override"] --> T8["catalog + pricing_overrides"]
+    S39["S39 Publish"] --> P9["publish"] --> T9["catalog_publications + storefront + share_links"]
+    S50["S50 Orders"] --> P10["GET /orders?owner=me"] --> T10["orders + items"]
+    S52["S52 Fulfillment"] --> P11["prepare / ship / fulfillment event"] --> T11["orders + fulfillments + events"]
+    S60["S60 Money"] --> P12["GET /earnings/summary"] --> T12["earnings_ledger + payments"]
+```
+
+## 14.2 B2C Critical Path
+
+```mermaid
+flowchart LR
+    B10["B10 Home"] --> D["GET /v1/discovery/products"] --> C1["catalog + publications + products"]
+    B20["B20 Search"] --> D
+    B30["B30 Product"] --> PD["GET /v1/public/products/{id}"] --> C2["products + variants + media + stories + provenance"]
+    B40["B40 Cart"] --> CART["GET/POST /v1/carts..."] --> C3["buyer_sessions + carts + cart_items"]
+    B50["B50 Checkout"] --> VAL["POST /v1/checkout/validate"] --> C4["inventory + reservations"]
+    B52["B52 Confirmation"] --> ORD["POST /v1/checkout/orders"] --> C5["orders + order_items + addresses + payment_records"]
+    B60["B60 Tracking"] --> TRACK["GET /v1/buyer/orders/{id} + fulfillment"] --> C6["orders + fulfillments + events"]
+```
+
+## 14.3 B2B Critical Path
+
+```mermaid
+flowchart LR
+    BB20["BB20 Requirement"] --> R1["POST /v1/b2b/requirements"] --> RDB["buyer_requirements + items"]
+    BB23["BB23 Review / Publish"] --> R2["POST /publish"] --> ODB["market_opportunities"]
+    BB30["BB30 Matches"] --> M1["POST /match"] --> MDB["market_matches + factors + capacity snapshots"]
+    BB31["BB31 Match Detail"] --> M2["GET /matches/{id}"] --> MDB
+    BB32["BB32 Quote Request"] --> Q1["POST quotation-requests"] --> QDB["quotations + quotation_items"]
+    BB40["BB40 Quote"] --> Q2["GET quotation"] --> QDB
+    BB42["BB42 Change Request"] --> Q3["POST revision-request"] --> QDB
+    BB50["BB50 Converted Order"] --> Q4["POST quotation/{id}/accept"] --> ODB2["orders + order_items + reservation/payment state"]
+```
+
+## 14.4 Didi Critical Path
+
+```mermaid
+sequenceDiagram
+    participant D as Didi UI
+    participant A as Auth / Scope
+    participant API as FastAPI
+    participant DB as PostgreSQL
+    D->>A: Open assigned artisan
+    A->>API: Verify role + cluster + assignment
+    API->>DB: Read artisan/session scope
+    D->>API: Start assistance session
+    API->>DB: Create assistance_sessions
+    D->>API: Perform scoped action
+    API->>DB: Write assistance_session_actions + target mutation
+    API->>DB: Write audit event
+    D->>API: Close session
+    API->>DB: Close assistance_sessions
+```
+
+## 14.5 Offline / Conflict Path
+
+```mermaid
+flowchart LR
+    Screen["Seller Screen"] --> Local["SQLite / Drift"]
+    Local --> Queue["sync_queue_items"]
+    Queue --> Push["POST /v1/sync/push"]
+    Push --> DB[("PostgreSQL")]
+    DB --> Conflict["sync_conflicts"]
+    Conflict --> Compare["GET /conflicts/{id}/comparison"]
+    Compare --> Resolve["POST /conflicts/{id}/resolve"]
+    Resolve --> DB
+    DB --> Pull["GET /v1/sync/pull"]
+    Pull --> Local
+```
 
 # 15. Screen Inventory
 
