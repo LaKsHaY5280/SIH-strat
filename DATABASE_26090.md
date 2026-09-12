@@ -96,22 +96,22 @@ The LLM, STT model, vision model or pricing model must never directly mutate aut
 
 ## 3.1 Primary Conventions
 
-| Concern                    | Decision                                             |
-| -------------------------- | ---------------------------------------------------- |
-| Database                   | PostgreSQL                                           |
-| Managed MVP                | Supabase Free                                        |
-| ORM/query layer            | Drizzle ORM                                          |
-| Primary key                | UUID                                                 |
-| Time                       | `TIMESTAMPTZ` in UTC                                 |
-| Money                      | `NUMERIC(12,2)`                                      |
-| Counts                     | `INTEGER`                                            |
-| Long-form text             | `TEXT`                                               |
-| Flexible model metadata    | `JSONB` only where justified                         |
-| Entity revision            | `BIGINT`                                             |
-| Audit timestamps           | `TIMESTAMPTZ`                                        |
-| Soft deletion              | Explicit status/deletion timestamp only where needed |
-| Binary media               | Object storage, not PostgreSQL blobs                 |
-| Server authoritative state | PostgreSQL                                           |
+| Concern | Decision |
+|---|---|
+| Database | PostgreSQL |
+| Managed MVP | Supabase Free |
+| ORM/query layer | Drizzle ORM |
+| Primary key | UUID |
+| Time | `TIMESTAMPTZ` in UTC |
+| Money | `NUMERIC(12,2)` |
+| Counts | `INTEGER` |
+| Long-form text | `TEXT` |
+| Flexible model metadata | `JSONB` only where justified |
+| Entity revision | `BIGINT` |
+| Audit timestamps | `TIMESTAMPTZ` |
+| Soft deletion | Explicit status/deletion timestamp only where needed |
+| Binary media | Object storage, not PostgreSQL blobs |
+| Server authoritative state | PostgreSQL |
 
 ## 3.2 Naming
 
@@ -262,7 +262,410 @@ erDiagram
 
 ---
 
-# 6. Class Diagram
+# 6. PostgreSQL Table Relationship Diagram
+
+This diagram is the **physical database view** of the schema. Unlike the domain class diagram below, it uses the actual PostgreSQL table names and highlights primary keys (`PK`) and foreign keys (`FK`). It is intentionally kept at the key-column level so the complete column definitions remain in the SQL table sections later in this document.
+
+```mermaid
+classDiagram
+    direction TB
+
+    class users {
+        <<table>>
+        PK UUID id
+        string phone_number
+        enum status
+        timestamptz created_at
+    }
+    class roles {
+        <<table>>
+        PK role_code code
+        string description
+    }
+    class user_roles {
+        <<table>>
+        PK FK UUID user_id
+        PK FK role_code role_code
+        timestamptz created_at
+    }
+    class devices {
+        <<table>>
+        PK UUID id
+        FK UUID user_id
+        string platform
+        string status
+    }
+    class organizations {
+        <<table>>
+        PK UUID id
+        string name
+        string status
+    }
+    class clusters {
+        <<table>>
+        PK UUID id
+        FK UUID organization_id
+        string name
+        string region
+    }
+    class artisan_profiles {
+        <<table>>
+        PK UUID id
+        FK UUID user_id
+        FK UUID cluster_id
+        string display_name
+        string preferred_language
+        string status
+    }
+    class assistance_sessions {
+        <<table>>
+        PK UUID id
+        FK UUID artisan_id
+        FK UUID crp_user_id
+        FK UUID organization_id
+        FK UUID cluster_id
+        enum status
+        timestamptz started_at
+        timestamptz ended_at
+    }
+    class assistance_session_actions {
+        <<table>>
+        PK UUID id
+        FK UUID session_id
+        FK UUID actor_user_id
+        string action
+        string entity_type
+        UUID entity_id
+    }
+
+    class products {
+        <<table>>
+        PK UUID id
+        FK UUID artisan_id
+        string title
+        string craft_type
+        string material
+        string status
+        BIGINT version
+    }
+    class product_variants {
+        <<table>>
+        PK UUID id
+        FK UUID product_id
+        string sku
+        numeric unit_price
+        int quantity_available
+        BIGINT version
+    }
+    class product_media {
+        <<table>>
+        PK UUID id
+        FK UUID product_id
+        string media_type
+        string object_key
+        boolean is_original
+    }
+    class catalog_entries {
+        <<table>>
+        PK UUID id
+        FK UUID product_id
+        string channel
+        string status
+        BIGINT version
+    }
+    class production_stories {
+        <<table>>
+        PK UUID id
+        FK UUID artisan_id
+        FK UUID product_id
+        string language_code
+        boolean is_public
+    }
+    class product_field_sources {
+        <<table>>
+        PK UUID id
+        FK UUID product_id
+        string field_name
+        string source_type
+        decimal confidence
+    }
+
+    class inventory {
+        <<table>>
+        PK UUID id
+        FK UUID variant_id
+        int available_quantity
+        int reserved_quantity
+        BIGINT version
+    }
+    class inventory_reservations {
+        <<table>>
+        PK UUID id
+        FK UUID variant_id
+        FK UUID order_id
+        int quantity
+        string status
+        timestamptz expires_at
+    }
+    class inventory_movements {
+        <<table>>
+        PK UUID id
+        FK UUID variant_id
+        FK UUID actor_user_id
+        int quantity_delta
+        BIGINT previous_revision
+        BIGINT resulting_revision
+    }
+    class customers {
+        <<table>>
+        PK UUID id
+        string customer_type
+        string display_name
+        string status
+    }
+    class orders {
+        <<table>>
+        PK UUID id
+        FK UUID customer_id
+        string status
+        numeric total_amount
+        BIGINT version
+    }
+    class order_items {
+        <<table>>
+        PK UUID id
+        FK UUID order_id
+        FK UUID variant_id
+        int quantity
+        numeric unit_price
+    }
+    class fulfillments {
+        <<table>>
+        PK UUID id
+        FK UUID order_id
+        string status
+        string delivery_reference
+    }
+    class payment_records {
+        <<table>>
+        PK UUID id
+        FK UUID order_id
+        string status
+        numeric amount
+    }
+
+    class voice_interactions {
+        <<table>>
+        PK UUID id
+        FK UUID actor_user_id
+        string language_code
+        string transcript
+        string intent
+    }
+    class ai_jobs {
+        <<table>>
+        PK UUID id
+        FK UUID voice_interaction_id
+        string capability
+        string status
+        string provider
+        string model
+    }
+    class ai_decisions {
+        <<table>>
+        PK UUID id
+        FK UUID ai_job_id
+        string source_type
+        decimal confidence
+        string confirmation_status
+    }
+    class price_recommendations {
+        <<table>>
+        PK UUID id
+        FK UUID product_id
+        numeric suggested_price
+        numeric confidence
+    }
+    class market_comparables {
+        <<table>>
+        PK UUID id
+        FK UUID price_recommendation_id
+        string source
+        numeric price
+    }
+    class ai_corrections {
+        <<table>>
+        PK UUID id
+        FK UUID ai_decision_id
+        FK UUID corrected_by
+        string field_name
+        string reason
+    }
+
+    class buyer_requirements {
+        <<table>>
+        PK UUID id
+        FK UUID buyer_id
+        string status
+        numeric budget_max
+        int quantity_required
+    }
+    class buyer_requirement_items {
+        <<table>>
+        PK UUID id
+        FK UUID buyer_requirement_id
+        string attribute_name
+        string attribute_value
+    }
+    class quotations {
+        <<table>>
+        PK UUID id
+        FK UUID buyer_requirement_id
+        FK UUID cluster_id
+        string status
+        numeric total_amount
+    }
+    class quotation_items {
+        <<table>>
+        PK UUID id
+        FK UUID quotation_id
+        FK UUID variant_id
+        int quantity
+        numeric unit_price
+    }
+    class market_readiness {
+        <<table>>
+        PK UUID id
+        FK UUID cluster_id
+        string channel
+        string status
+    }
+    class market_readiness_items {
+        <<table>>
+        PK UUID id
+        FK UUID market_readiness_id
+        string requirement_code
+        string status
+    }
+
+    class sync_queue_items {
+        <<table>>
+        PK UUID id
+        FK UUID actor_user_id
+        UUID entity_id
+        string entity_type
+        string operation_type
+        BIGINT base_revision
+        string idempotency_key
+        string status
+    }
+    class sync_conflicts {
+        <<table>>
+        PK UUID id
+        FK UUID sync_queue_item_id
+        BIGINT server_revision
+        BIGINT client_revision
+        string status
+    }
+    class sync_conflict_resolutions {
+        <<table>>
+        PK UUID id
+        FK UUID sync_conflict_id
+        FK UUID resolved_by
+        string resolution_type
+        string reason
+    }
+
+    class verifications {
+        <<table>>
+        PK UUID id
+        FK UUID subject_user_id
+        FK UUID performed_by
+        string verification_type
+        string status
+    }
+    class audit_events {
+        <<table>>
+        PK UUID id
+        FK UUID actor_user_id
+        string action
+        string entity_type
+        UUID entity_id
+        string channel
+    }
+    class data_export_requests {
+        <<table>>
+        PK UUID id
+        FK UUID requested_by
+        string status
+        timestamptz requested_at
+    }
+    class data_deletion_requests {
+        <<table>>
+        PK UUID id
+        FK UUID requested_by
+        string status
+        timestamptz requested_at
+    }
+
+    users "1" --> "many" user_roles : user_id
+    roles "1" --> "many" user_roles : role_code
+    users "1" --> "many" devices : user_id
+    organizations "1" --> "many" clusters : organization_id
+    clusters "1" --> "many" artisan_profiles : cluster_id
+    users "1" --> "0..1" artisan_profiles : user_id
+    artisan_profiles "1" --> "many" assistance_sessions : artisan_id
+    users "1" --> "many" assistance_sessions : crp_user_id
+    assistance_sessions "1" --> "many" assistance_session_actions : session_id
+    users "1" --> "many" assistance_session_actions : actor_user_id
+
+    artisan_profiles "1" --> "many" products : artisan_id
+    products "1" --> "many" product_variants : product_id
+    products "1" --> "many" product_media : product_id
+    products "1" --> "many" catalog_entries : product_id
+    products "1" --> "many" production_stories : product_id
+    products "1" --> "many" product_field_sources : product_id
+
+    product_variants "1" --> "many" inventory : variant_id
+    product_variants "1" --> "many" inventory_reservations : variant_id
+    product_variants "1" --> "many" inventory_movements : variant_id
+    customers "1" --> "many" orders : customer_id
+    orders "1" --> "many" order_items : order_id
+    product_variants "1" --> "many" order_items : variant_id
+    orders "1" --> "0..1" fulfillments : order_id
+    orders "1" --> "many" payment_records : order_id
+    orders "1" --> "many" inventory_reservations : order_id
+
+    voice_interactions "1" --> "many" ai_jobs : voice_interaction_id
+    ai_jobs "1" --> "many" ai_decisions : ai_job_id
+    products "1" --> "many" price_recommendations : product_id
+    price_recommendations "1" --> "many" market_comparables : price_recommendation_id
+    ai_decisions "1" --> "many" ai_corrections : ai_decision_id
+
+    buyer_requirements "1" --> "many" buyer_requirement_items : buyer_requirement_id
+    buyer_requirements "1" --> "many" quotations : buyer_requirement_id
+    clusters "1" --> "many" quotations : cluster_id
+    quotations "1" --> "many" quotation_items : quotation_id
+    product_variants "1" --> "many" quotation_items : variant_id
+    clusters "1" --> "many" market_readiness : cluster_id
+    market_readiness "1" --> "many" market_readiness_items : market_readiness_id
+
+    users "1" --> "many" sync_queue_items : actor_user_id
+    sync_queue_items "1" --> "many" sync_conflicts : sync_queue_item_id
+    sync_conflicts "1" --> "many" sync_conflict_resolutions : sync_conflict_id
+    users "1" --> "many" sync_conflict_resolutions : resolved_by
+
+    users "1" --> "many" verifications : performed_by
+    users "1" --> "many" audit_events : actor_user_id
+    users "1" --> "many" data_export_requests : requested_by
+    users "1" --> "many" data_deletion_requests : requested_by
+```
+
+**Diagram key:** `PK` = primary key, `FK` = foreign key. Relationship labels use the actual FK column where it improves traceability.
+
+---
+
+# 7. Class Diagram
 
 The class diagram describes the application/domain objects represented by the database. It is intentionally separate from the physical SQL schema.
 
@@ -1380,32 +1783,32 @@ Deletion must respect transactional and audit-retention requirements.
 
 # 17. Database Class / Responsibility Mapping
 
-| Database area                         | Authoritative responsibility                |
-| ------------------------------------- | ------------------------------------------- |
-| `users`, `roles`, `user_roles`        | Identity and access model                   |
-| `devices`                             | Trusted-device registration                 |
-| `organizations`, `clusters`           | Deployment hierarchy                        |
-| `artisan_profiles`                    | Artisan business identity                   |
-| `assistance_sessions`                 | Scoped Didi/CRP access                      |
-| `products`, `product_variants`        | Sellable product model                      |
-| `product_media`, `production_stories` | Product/craft media                         |
-| `catalog_entries`                     | Channel/language publication representation |
-| `inventory`                           | Authoritative stock state                   |
-| `inventory_reservations`              | Temporary stock allocation                  |
-| `inventory_movements`                 | Immutable inventory audit trail             |
-| `orders`, `order_items`               | Commerce order state                        |
-| `fulfillments`                        | Delivery state                              |
-| `payment_records`                     | Payment/earnings state representation       |
-| `ai_jobs`, `ai_decisions`             | AI execution and decision evidence          |
-| `price_recommendations`               | Price advisory output                       |
-| `market_comparables`                  | Pricing/market evidence                     |
-| `buyer_requirements`, `quotations`    | B2B workflow                                |
-| `market_readiness*`                   | Government/channel readiness                |
-| `sync_queue_items`                    | Offline operation queue                     |
-| `sync_conflicts*`                     | Conflict state and resolution               |
-| `audit_events`                        | System accountability                       |
-| `data_export_requests`                | Data portability                            |
-| `data_deletion_requests`              | Data deletion workflow                      |
+| Database area | Authoritative responsibility |
+|---|---|
+| `users`, `roles`, `user_roles` | Identity and access model |
+| `devices` | Trusted-device registration |
+| `organizations`, `clusters` | Deployment hierarchy |
+| `artisan_profiles` | Artisan business identity |
+| `assistance_sessions` | Scoped Didi/CRP access |
+| `products`, `product_variants` | Sellable product model |
+| `product_media`, `production_stories` | Product/craft media |
+| `catalog_entries` | Channel/language publication representation |
+| `inventory` | Authoritative stock state |
+| `inventory_reservations` | Temporary stock allocation |
+| `inventory_movements` | Immutable inventory audit trail |
+| `orders`, `order_items` | Commerce order state |
+| `fulfillments` | Delivery state |
+| `payment_records` | Payment/earnings state representation |
+| `ai_jobs`, `ai_decisions` | AI execution and decision evidence |
+| `price_recommendations` | Price advisory output |
+| `market_comparables` | Pricing/market evidence |
+| `buyer_requirements`, `quotations` | B2B workflow |
+| `market_readiness*` | Government/channel readiness |
+| `sync_queue_items` | Offline operation queue |
+| `sync_conflicts*` | Conflict state and resolution |
+| `audit_events` | System accountability |
+| `data_export_requests` | Data portability |
+| `data_deletion_requests` | Data deletion workflow |
 
 ---
 
@@ -1853,18 +2256,18 @@ Supabase-managed backup capabilities, retention and recovery limits must be chec
 
 # 28. Data Retention & Deletion Matrix
 
-| Data                   | Default handling                      | Deletion principle                                   |
-| ---------------------- | ------------------------------------- | ---------------------------------------------------- |
-| Raw voice              | Temporary processing input            | Delete after processing unless retained as story     |
-| Original product image | Retained if product/media requires it | User-controlled where legally possible               |
-| Enhanced image         | Retained with product media           | Delete with underlying media where allowed           |
-| Product metadata       | Business record                       | Retain until product deletion/archive policy permits |
-| Inventory history      | Audit/business history                | Longer retention                                     |
-| Orders                 | Transactional record                  | Retain according to business/legal policy            |
-| Payment records        | Transactional record                  | Retain according to provider/legal requirements      |
-| Audit events           | Accountability record                 | Longer retention                                     |
-| AI job logs            | Operational record                    | Minimize payload and retain according to policy      |
-| Export packages        | Temporary                             | Expire after download window                         |
+| Data | Default handling | Deletion principle |
+|---|---|---|
+| Raw voice | Temporary processing input | Delete after processing unless retained as story |
+| Original product image | Retained if product/media requires it | User-controlled where legally possible |
+| Enhanced image | Retained with product media | Delete with underlying media where allowed |
+| Product metadata | Business record | Retain until product deletion/archive policy permits |
+| Inventory history | Audit/business history | Longer retention |
+| Orders | Transactional record | Retain according to business/legal policy |
+| Payment records | Transactional record | Retain according to provider/legal requirements |
+| Audit events | Accountability record | Longer retention |
+| AI job logs | Operational record | Minimize payload and retain according to policy |
+| Export packages | Temporary | Expire after download window |
 
 ---
 
@@ -1894,24 +2297,24 @@ export.zip
 
 # 30. Database-to-Feature Traceability
 
-| Product / architecture feature | Primary database entities                                                            |
-| ------------------------------ | ------------------------------------------------------------------------------------ |
-| Voice-first catalog creation   | `voice_interactions`, `ai_jobs`, `ai_decisions`, `products`, `product_field_sources` |
-| Image enhancement              | `product_media`, `ai_jobs`, `ai_decisions`                                           |
-| Multilingual catalog           | `catalog_entries`                                                                    |
-| Production story               | `production_stories`, `product_media`                                                |
-| AI pricing                     | `price_recommendations`, `market_comparables`, `ai_decisions`                        |
-| Inventory                      | `inventory`, `inventory_reservations`, `inventory_movements`                         |
-| Orders                         | `orders`, `order_items`, `fulfillments`, `payment_records`                           |
-| Didi / CRP                     | `assistance_sessions`, `assistance_session_actions`                                  |
-| Offline-first                  | `sync_queue_items`                                                                   |
-| Conflict resolution            | `sync_conflicts`, `sync_conflict_resolutions`, `audit_events`                        |
-| B2B market linkage             | `buyer_requirements`, `quotations`                                                   |
-| Government readiness           | `market_readiness`, `market_readiness_items`                                         |
-| ONDC adapter                   | `catalog_entries`, product/inventory/order domain state                              |
-| Data export                    | `data_export_requests` + domain/media records                                        |
-| Data deletion                  | `data_deletion_requests`                                                             |
-| Verification / trust           | `verifications`, `product_field_sources`, `audit_events`                             |
+| Product / architecture feature | Primary database entities |
+|---|---|
+| Voice-first catalog creation | `voice_interactions`, `ai_jobs`, `ai_decisions`, `products`, `product_field_sources` |
+| Image enhancement | `product_media`, `ai_jobs`, `ai_decisions` |
+| Multilingual catalog | `catalog_entries` |
+| Production story | `production_stories`, `product_media` |
+| AI pricing | `price_recommendations`, `market_comparables`, `ai_decisions` |
+| Inventory | `inventory`, `inventory_reservations`, `inventory_movements` |
+| Orders | `orders`, `order_items`, `fulfillments`, `payment_records` |
+| Didi / CRP | `assistance_sessions`, `assistance_session_actions` |
+| Offline-first | `sync_queue_items` |
+| Conflict resolution | `sync_conflicts`, `sync_conflict_resolutions`, `audit_events` |
+| B2B market linkage | `buyer_requirements`, `quotations` |
+| Government readiness | `market_readiness`, `market_readiness_items` |
+| ONDC adapter | `catalog_entries`, product/inventory/order domain state |
+| Data export | `data_export_requests` + domain/media records |
+| Data deletion | `data_deletion_requests` |
+| Verification / trust | `verifications`, `product_field_sources`, `audit_events` |
 
 ---
 
@@ -2167,16 +2570,16 @@ Recommended order:
 
 These items should be explicitly decided during implementation rather than silently assumed.
 
-| Decision                         | Current position                                                                    |
-| -------------------------------- | ----------------------------------------------------------------------------------- |
-| Exact Drizzle runtime/binding    | Follow final backend implementation choice                                          |
-| Password/PIN hashing library     | Must use a modern password hashing algorithm; final library is implementation-level |
-| Supabase Auth integration        | Optional production upgrade; not mandatory for ₹0 MVP identity flow                 |
-| Exact RLS policy syntax          | Implement after final Supabase auth/session strategy is locked                      |
-| Long-term analytics model        | Not needed for MVP                                                                  |
-| Payment-provider-specific fields | Keep adapter-owned; do not pollute core payment state                               |
-| ONDC-specific persistence        | Keep external payloads in adapter/integration storage only as required              |
-| Full data retention durations    | Must be finalized against operational/legal requirements before production          |
+| Decision | Current position |
+|---|---|
+| Exact Drizzle runtime/binding | Follow final backend implementation choice |
+| Password/PIN hashing library | Must use a modern password hashing algorithm; final library is implementation-level |
+| Supabase Auth integration | Optional production upgrade; not mandatory for ₹0 MVP identity flow |
+| Exact RLS policy syntax | Implement after final Supabase auth/session strategy is locked |
+| Long-term analytics model | Not needed for MVP |
+| Payment-provider-specific fields | Keep adapter-owned; do not pollute core payment state |
+| ONDC-specific persistence | Keep external payloads in adapter/integration storage only as required |
+| Full data retention durations | Must be finalized against operational/legal requirements before production |
 
 ---
 
