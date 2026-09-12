@@ -4,7 +4,7 @@
 
 > **Purpose:** Define the technical architecture for the solution described in `SOLUTION_26090.md`.
 >
-> **Status:** Architecture baseline / v2 — **₹0 cash-cost SIH MVP**
+> **Status:** Architecture baseline / v3 — **₹0 cash-cost SIH MVP**
 >
 > **Architecture principle:** Keep the artisan experience extremely simple while keeping the internal system modular, auditable, replaceable and scalable.
 
@@ -817,6 +817,12 @@ The ₹0 MVP therefore keeps identity usable without mandatory paid SMS.
 
 Supabase Auth phone authentication, Firebase Auth or another OTP provider can be added later once a communications budget exists.
 
+### Sensitive-action unlock
+
+If the device supports Android/iOS biometrics, biometric unlock may be added for **sensitive local actions** such as publishing, changing payout details, or resolving critical conflicts. Biometrics are treated as a device-local convenience layer, not the primary identity authority.
+
+The ₹0 MVP does not require biometrics because availability and device capability vary.
+
 ---
 
 ## 10.3 CRP / Didi Authorization
@@ -873,6 +879,42 @@ The application never directly embeds provider-specific business logic.
 ---
 
 ## 11.2 ₹0 Provider Matrix
+
+| Capability | ₹0 MVP Primary | Optional / Free-Tier Alternative | Selection Criteria | MVP Deployment Location |
+|---|---|---|---|---|
+| STT | **AI4Bharat IndicConformer 600M locally** | faster-whisper / Whisper-family | Indian-language accuracy, local inference | Team-controlled inference machine; optionally compressed/quantized |
+| Translation | **IndicTrans2/IndicTrans3 locally** | Bhashini/open endpoint where available | Indian-language coverage and fidelity | Team-controlled inference machine |
+| LLM | **Ollama + Qwen3 4B/8B locally** | Gemini free tier for limited fallback/testing | structured output, latency, hardware load | Team-controlled inference machine |
+| Vision | **OpenCV + lightweight local segmentation** | SAM/SAM2 local | fidelity and compute requirements | Device for lightweight ops; inference machine for heavier segmentation |
+| TTS | **Piper / compatible open Indian-language model** | Bhashini/open option | language coverage, latency | Team-controlled inference machine; cached output where practical |
+| Embeddings | **sentence-transformers locally** | none required | semantic matching/retrieval | Team-controlled inference machine |
+
+### 11.2.1 Model Deployment Rule
+
+The ₹0 MVP uses a **self-hosted local inference node** rather than attempting to execute large models inside free edge/serverless runtimes.
+
+```text
+Flutter App
+    ↓
+FastAPI / AI Gateway
+    ↓
+Local Inference Node (team laptop/desktop)
+    ├── IndicConformer
+    ├── Ollama + Qwen3
+    ├── IndicTrans
+    ├── Piper / TTS
+    └── Vision models
+```
+
+For the SIH demonstration, the inference node can run on one designated team machine on the same trusted network or through a temporary tunnel. No paid GPU is required. CPU-only operation is the fallback, but language-model size and concurrency must be kept within the available hardware budget.
+
+This means:
+
+- Cloudflare Workers: routing/edge only.
+- Supabase Edge Functions: lightweight backend utilities only.
+- Heavy AI inference: team-controlled machine for MVP.
+- Future production: replace local inference adapter with managed compute/GPU if justified.
+
 
 | Capability | ₹0 MVP Primary | Optional / Free-Tier Alternative | Selection Criteria |
 |---|---|---|---|
@@ -1140,6 +1182,24 @@ CONSUMED
 
 There must be one authoritative inventory state inside our platform even when products appear through multiple external channels.
 
+### 17.1.1 Inventory Audit & Anti-Overselling Controls
+
+Every inventory mutation creates an immutable `InventoryMovement` record containing:
+
+- variant ID;
+- quantity delta;
+- reason;
+- actor/user ID;
+- source channel/device;
+- order/reservation reference where applicable;
+- previous revision;
+- resulting revision;
+- timestamp.
+
+Critical writes use **optimistic locking** (`version` / revision check) and transactional reservation. A stale client cannot silently overwrite current inventory.
+
+For one-of-one products and low-stock variants, reservation is the authoritative protection against overselling.
+
 ---
 
 ## 17.2 Orders
@@ -1210,27 +1270,58 @@ flowchart LR
 
 ## 18.2 ONDC Boundary
 
-ONDC describes Seller Network Participants as responsible for connecting sellers through seller applications, digitizing catalogues, dispersing payments and supporting seller enablement. urlONDC Seller Network Participantshttps://www.ondc.org/pages/seller-network-participants.html
+ONDC describes Seller Network Participants as responsible for connecting sellers through seller applications, digitizing catalogues, managing seller-side commerce interactions and supporting seller enablement. Official ONDC technical resources also provide staging/pre-production environments and a reference seller-app implementation.
 
 ### ₹0 MVP
 
 Do **not** lock a commercial SNP.
 
-Build:
+Build and validate an **ONDC adapter boundary** against the current official staging/reference resources where access is available.
 
 ```text
 Our Platform
     ↓
-Seller/ONDC Adapter
+Seller / ONDC Adapter
     ↓
-Sandbox / reference integration where available
+ONDC staging / reference seller app boundary
     ↓
-ONDC Network
+ONDC network semantics
 ```
 
-The production SNP is a **Phase-2 external-deployment decision**.
+### Minimum sandbox scope
 
-ONDC maintains a participant registry and published technical/operational resources that can later be used to select a compatible participant. urlONDC ecosystem participantshttps://www.ondc.org/pages/ecosystem-participants.html
+The MVP adapter should model the smallest useful seller journey:
+
+1. **Catalog publication / refresh**
+   - seller/provider identity
+   - store/catalog metadata
+   - item/category
+   - item description
+   - price
+   - availability / quantity
+   - variant information where supported
+   - media references
+
+2. **Discovery acknowledgement**
+   - receive/validate catalog discovery callbacks where the sandbox flow supports them
+
+3. **Order lifecycle demonstration**
+   - `search/on_search` (or the equivalent supported catalog-discovery flow)
+   - `select/on_select`
+   - `init/on_init`
+   - `confirm/on_confirm`
+   - selected order-status callbacks
+
+4. **Cancellation path**
+   - `cancel/on_cancel` for the supported sandbox flow
+
+The exact domain/version and mandatory fields must be taken from the **current ONDC sandbox contract used by the team**, not frozen from this architecture document. ONDC's official seller-app reference implementation lists catalog refresh, variants, availability schedules and order-flow support, while its protocol validation tooling exposes concrete search/select/init/confirm/status/cancel sequences.
+
+### What this proves
+
+The MVP proves that our internal product model can map into an ONDC-compatible seller boundary. It does **not** claim production network onboarding, settlement readiness, or live buyer-app reach.
+
+The production SNP is a **Phase-2 external-deployment decision**.
 
 ---
 
@@ -1447,9 +1538,49 @@ Do not introduce RabbitMQ, Kafka or Redis for the MVP unless a real workload pro
 
 ---
 
-# 21. Storage Architecture
+# 21. Data Ownership, Export & Deletion
 
-## 21.1 Relational Data
+## 21.1 Ownership Principle
+
+The artisan is the **primary data subject and business owner** for their product data, media and production stories, subject to applicable platform/network obligations and legitimate audit records.
+
+The platform stores and processes data on the artisan's behalf; it does not claim ownership of the underlying product images, voice narratives or craft stories.
+
+## 21.2 User Controls
+
+The architecture supports:
+
+- **Download My Data** — export structured profile/product/order data and owned media references.
+- **Delete Draft / Delete Media** — remove user-created content where no legal/transactional retention requirement prevents deletion.
+- **Voice Recording Retention Choice** — raw audio can be deleted after transcription/confirmation unless explicitly retained as a production story.
+- **Visibility Control** — artisan chooses whether a production story is public.
+
+## 21.3 Retention Rules
+
+```text
+Raw voice/image
+    ↓
+Used for processing
+    ↓
+Delete when no longer needed
+    OR
+    ↓
+Retain because artisan explicitly published/retained it
+```
+
+Transaction/audit records may have longer retention because they represent business state and system accountability.
+
+## 21.4 Export Format
+
+Preferred export is a portable package containing:
+
+- JSON for structured records;
+- original media files where permitted;
+- metadata mapping files to products/orders/stories.
+
+# 22. Storage Architecture
+
+## 22.1 Relational Data
 
 PostgreSQL stores:
 
@@ -1463,7 +1594,7 @@ PostgreSQL stores:
 - verification data;
 - audit events.
 
-## 21.2 Object Storage
+## 22.2 Object Storage
 
 Stores:
 
@@ -1493,9 +1624,9 @@ Alternative later:
 
 ---
 
-# 22. Security Architecture
+# 23. Security Architecture
 
-## 22.1 Data Security
+## 23.1 Data Security
 
 - TLS in transit;
 - encryption at rest through managed infrastructure;
@@ -1506,7 +1637,7 @@ Alternative later:
 
 ---
 
-## 22.2 Authorization
+## 23.2 Authorization
 
 Every mutation checks:
 
@@ -1524,7 +1655,7 @@ Is the action allowed in the current workflow state?
 
 ---
 
-## 22.3 Audit Logging
+## 23.3 Audit Logging
 
 Audit:
 
@@ -1540,7 +1671,7 @@ Audit:
 
 ---
 
-## 22.4 AI Data Handling
+## 23.4 AI Data Handling
 
 For every external provider, document:
 
@@ -1554,7 +1685,7 @@ Local inference is preferred where privacy and ₹0 constraints make it practica
 
 ---
 
-# 23. Reliability & Failure Handling
+# 24. Reliability & Failure Handling
 
 | Failure | Fallback |
 |---|---|
@@ -1576,7 +1707,7 @@ Local inference is preferred where privacy and ₹0 constraints make it practica
 
 ---
 
-# 24. Observability
+# 25. Observability
 
 ## 24.1 Application Metrics
 
@@ -1613,9 +1744,51 @@ Local inference is preferred where privacy and ₹0 constraints make it practica
 
 ---
 
-# 25. Deployment & DevOps
+# 26. Performance, Latency & Capacity Targets
 
-## 25.1 ₹0 MVP Deployment
+## 25.1 User-Perceived Latency Targets
+
+These are MVP engineering targets, not production SLAs:
+
+| Operation | Target | Notes |
+|---|---:|---|
+| App navigation / local UI | < 300 ms | Local-first, no network dependency |
+| Draft save | < 500 ms | Local DB |
+| Confirmation screen after local state update | < 1 s | Excludes cloud AI |
+| STT result | < 8 s | 10–15 s voice clip on team hardware |
+| Catalog draft generation | < 10 s | Target; depends on local model |
+| Image enhancement | < 15 s | Target for one product image |
+| Price recommendation | < 5 s | Deterministic path should be near-instant |
+| Online sync after connectivity | ≤ 60 s target | Background sync; faster when possible |
+| Critical online inventory mutation | < 2 s backend target | Must confirm server state |
+
+If a target cannot be met on available hardware, the UX must show progress and allow the user to continue safely rather than pretending the operation completed.
+
+## 25.2 Capacity Targets for SIH MVP
+
+The MVP is validated against:
+
+- 1,000 registered users;
+- 100 concurrent active sessions;
+- 10 concurrent AI jobs on the designated inference machine;
+- 100,000 API requests/day as an architectural test envelope;
+- queue backpressure when AI capacity is saturated.
+
+These targets are intentionally modest and testable. They are not claims about national production scale.
+
+## 25.3 Low-End Device Budget
+
+The client should:
+
+- defer heavy inference away from the phone where possible;
+- resize/compress media before upload;
+- avoid large always-on processes;
+- release camera/audio resources promptly;
+- maintain responsive local navigation even while AI jobs run.
+
+# 27. Deployment & DevOps
+
+## 27.1 ₹0 MVP Deployment
 
 ```mermaid
 flowchart TB
@@ -1653,11 +1826,11 @@ flowchart TB
 
 Cloudflare Workers can act as edge/API infrastructure, but **large AI models should not run there** because the Free plan has limited CPU time per invocation. urlCloudflare Workers limitshttps://developers.cloudflare.com/workers/platform/limits/
 
-Local model inference runs on the development workstation or an explicitly free runtime suitable for the test workload.
+Local model inference runs on **team-controlled development/demo machines** (CPU/GPU as available) for the ₹0 MVP. Supabase Edge Functions and Cloudflare Workers are **not** model-inference hosts. They may route requests, persist jobs, or serve lightweight API/edge logic. The inference host is intentionally replaceable so a later deployment can move to managed GPU/CPU infrastructure without changing the AI Gateway contract.
 
 ---
 
-## 25.2 Environment Parity
+## 27.2 Environment Parity
 
 Use:
 
@@ -1683,9 +1856,13 @@ AI_VISION_PROVIDER=opencv
 
 Switching provider must not require application-code changes.
 
+### Infrastructure-as-Code Policy
+
+Terraform/OpenTofu is **not required for the ₹0 MVP** because the initial environment consists of a small number of free-tier resources and local inference. Before a production multi-environment deployment, infrastructure should be codified with Terraform/OpenTofu or equivalent so staging and production cannot drift.
+
 ---
 
-## 25.3 CI/CD
+## 27.3 CI/CD
 
 Preferred:
 
@@ -1701,7 +1878,7 @@ No paid CI service is required for MVP.
 
 ---
 
-# 26. Technology Stack — ₹0 MVP
+# 28. Technology Stack — ₹0 MVP
 
 | Layer | ₹0 MVP Primary | Alternatives | Why Primary |
 |---|---|---|---|
@@ -1728,7 +1905,7 @@ No paid CI service is required for MVP.
 
 ---
 
-# 27. Technology Selection Rules
+# 29. Technology Selection Rules
 
 Every technology must be evaluated against:
 
@@ -1749,9 +1926,9 @@ A paid service can be added only after an explicit budget decision.
 
 ---
 
-# 28. MVP Technical Scope
+# 30. MVP Technical Scope
 
-## 28.1 Must Be Implemented
+## 30.1 Must Be Implemented
 
 ### Mobile
 
@@ -1797,7 +1974,7 @@ A paid service can be added only after an explicit budget decision.
 
 ---
 
-## 28.2 Sandbox / Demonstration Only
+## 30.2 Sandbox / Demonstration Only
 
 - ONDC boundary / sandbox;
 - government readiness assessment;
@@ -1806,7 +1983,7 @@ A paid service can be added only after an explicit budget decision.
 
 ---
 
-## 28.3 Explicitly Out of MVP
+## 30.3 Explicitly Out of MVP
 
 - production phone-call Zero-UI agent;
 - paid telephony;
@@ -1820,7 +1997,7 @@ A paid service can be added only after an explicit budget decision.
 
 ---
 
-# 29. Critical End-to-End MVP Flow
+# 31. Critical End-to-End MVP Flow
 
 This is the primary implementation and demonstration path.
 
@@ -1856,7 +2033,7 @@ sequenceDiagram
 
 ---
 
-# 30. Future Phone-Call Architecture
+# 32. Future Phone-Call Architecture
 
 ```mermaid
 sequenceDiagram
@@ -1884,34 +2061,76 @@ There is intentionally **no duplicate product/order business logic** in the phon
 
 ---
 
-# 31. Resolved Architecture Questions — v2
+# 33. Resolved Architecture Questions — v3
 
-| ID | Decision |
+| ID | Resolution |
 |---|---|
-| Q1 | Local/open-source AI is primary: IndicConformer STT, Ollama + Qwen3 LLM, IndicTrans translation, local/open TTS, OpenCV + local segmentation. Free-tier cloud models are optional fallbacks. |
-| Q2 | AI Gateway provides retry, timeout, concurrency limits, circuit breaking, provider fallback and deterministic fallback. |
-| Q3 | No commercial ONDC SNP is locked for the ₹0 MVP. Build the adapter boundary and use sandbox/reference integration where available; choose an SNP only for Phase 2 production work. |
-| Q4 | GeM is represented as a plain-language readiness engine that reveals only missing requirements and routes complex cases to Didi/CRP. |
-| Q5 | Offline conflicts use revisions + optimistic concurrency. Safe metadata may merge; commerce-critical fields require resolution. |
-| Q6 | Target ≤60 seconds for ordinary changes after connectivity returns. Live inventory/order state is authoritative only after server confirmation. |
-| Q7 | Product → ProductVariant → Inventory → Reservation → OrderItem is the core commerce model. |
-| Q8 | Production stories are dedicated records linked to Product and Artisan; text is stored in Postgres, audio in object storage. |
-| Q9 | ₹0 MVP authentication is phone + PIN + device binding. OTP is optional production enhancement. |
-| Q10 | CRP/Didi uses RBAC + organization/cluster scope + server-side authorization + RLS where applicable. |
-| Q11 | Initial prototype capacity target: 1,000 registered users, ~100 concurrent sessions and ~10 concurrent AI jobs. These are engineering targets, not PS facts. |
-| Q12 | Queue priorities: P0 user-waiting, P1 normal, P2 background/bulk. |
-| Q13 | PostgreSQL via Supabase Free is the primary managed MVP database platform. |
-| Q14 | PostgreSQL-backed queue is used initially; no RabbitMQ/Kafka/Redis requirement. |
-| Q15 | STT fallback: local alternate model → repeat → visual/manual correction. |
-| Q16 | Critical failures surface in-app; push can supplement. Paid SMS is not a core dependency. |
-| Q17 | Unified modular monolith + workers, not microservices. |
-| Q18 | Provider configuration is environment-driven; dev/staging/prod use the same interfaces. |
-| Q19 | Image processing allows safe enhancement only and preserves the original. |
-| Q20 | Audit logs capture sensitive mutations and significant AI proposals/overrides with provider/model/action metadata where appropriate. |
+| Q1 | Local/open-source AI is primary. Heavy models run on a team-controlled inference machine for the ₹0 MVP, not on Cloudflare Workers or Supabase Edge Functions. Optional free-tier providers are adapters only. |
+| Q2 | AI Gateway implements timeouts, retries, concurrency limits, provider health, circuit breaker, fallback provider and deterministic fallback. Pricing can fall back to a deterministic cost-plus model. |
+| Q3 | No commercial SNP is locked for MVP. The ONDC adapter targets current staging/reference resources. The MVP proves catalog mapping plus a minimal seller-side order lifecycle; production SNP selection is a Phase-2 decision. |
+| Q4 | GeM readiness is a staged checklist showing only the next missing requirement in plain language; MVP is readiness guidance, not production registration. |
+| Q5 | Sync uses revisions + idempotency. Safe fields can auto-merge; commerce-critical conflicts open a manual merge/resolution UI or Didi escalation. |
+| Q6 | Target ordinary sync within 60 seconds after connectivity returns; live inventory/order state is authoritative only after server confirmation. |
+| Q7 | PostgreSQL models Product → Variant → Inventory → Reservation → OrderItem, with optimistic locking, movement history and transactional reservations. |
+| Q8 | Production stories are separate entities linked by product_id/artisan_id; text lives in PostgreSQL and audio in object storage with retention/visibility controls. |
+| Q9 | ₹0 MVP uses phone + PIN + device binding. Biometrics are optional local unlock for sensitive actions; paid OTP is a later production enhancement. |
+| Q10 | CRP/Didi access is scoped by role + organization + cluster + assigned artisan, with server-side checks and RLS where practical. |
+| Q11 | MVP validation envelope: 1,000 registered users, 100 concurrent sessions, 10 concurrent AI jobs and 100,000 API requests/day. These are engineering targets, not PS facts. |
+| Q12 | AI/image jobs use P0/P1/P2 priority: current user-waiting work first, normal work second, bulk/background work last. |
+| Q13 | PostgreSQL is the database; Supabase Free is the managed platform, not an alternative database. Drizzle is the preferred ORM/query layer. |
+| Q14 | PostgreSQL-backed queue + small worker pool for MVP; Redis/RabbitMQ/Kafka are deferred until workload proves they are needed. |
+| Q15 | STT fallback: retry → alternate local STT → repeat/manual correction. No paid API is required. |
+| Q16 | Critical failures surface in-app first; push can supplement. Paid SMS is not required for MVP. |
+| Q17 | Unified FastAPI modular monolith + asynchronous workers. Future interfaces and integrations reuse the same domain modules. |
+| Q18 | Dev/staging/prod use the same provider interfaces and environment-driven configuration. Terraform/OpenTofu is deferred for the tiny ₹0 MVP but becomes required before multi-environment production rollout to prevent drift. |
+| Q19 | Image enhancement is limited to safe transformations; original media is preserved and shown alongside the processed image when appropriate. |
+| Q20 | AI audit logs capture action, model/provider, input/output references, confidence where available, confirmation status, overrides and timestamps. Consequential AI results expose decision factors and a report/correct path. |
 
 ---
 
-# 32. Architecture Decision Records
+# 34. Data Dispute & AI Decision Review
+
+## 34.1 Explainability
+
+For consequential recommendations, the user sees **decision factors**, not hidden model reasoning.
+
+Example pricing explanation:
+
+```text
+Your material cost: ₹900
+Labour estimate: ₹400
+Comparable listings used: 8
+Suggested range: ₹1,500–₹1,700
+Confidence: Medium
+```
+
+The platform must not expose internal model chain-of-thought. It exposes concise factors, source references and uncertainty.
+
+## 34.2 Report / Correct
+
+Every consequential AI result provides a lightweight correction path:
+
+- Wrong product detail
+- Wrong price suggestion
+- Wrong translation
+- Wrong image enhancement
+- Other issue
+
+The correction becomes an audit event and, where appropriate, an evaluation example for later model improvement.
+
+## 34.3 Decision Dispute Workflow
+
+```mermaid
+flowchart LR
+    Result[AI Recommendation] --> User{User accepts?}
+    User -->|Yes| Commit[Commit / publish] 
+    User -->|No| Correct[Report / Correct]
+    Correct --> Review[Store evidence + reason]
+    Review --> Human[Didi / Admin review where needed]
+    Human --> Commit
+```
+
+# 35. Architecture Decision Records
 
 | ADR | Decision | Reason |
 |---|---|---|
@@ -1935,7 +2154,7 @@ These ADRs are starting decisions and should be revised explicitly rather than s
 
 ---
 
-# 33. Known Architecture Risks
+# 36. Known Architecture Risks
 
 | Risk | Impact | Mitigation |
 |---|---|---|
@@ -1956,7 +2175,7 @@ These ADRs are starting decisions and should be revised explicitly rather than s
 
 ---
 
-# 34. What Architecture Must Prove Before Implementation Is Locked
+# 37. What Architecture Must Prove Before Implementation Is Locked
 
 The team must validate:
 
@@ -2012,7 +2231,7 @@ These validations should produce implementation decisions rather than remain hid
 
 ---
 
-# 35. Final Architecture Summary
+# 38. Final Architecture Summary
 
 ```mermaid
 flowchart TB
@@ -2116,45 +2335,32 @@ without rebuilding the commerce core.
 
 ---
 
-# 36. Authoritative References
+# 39. Authoritative References
 
-1. Flutter — Supported platforms:  
-   https://docs.flutter.dev/reference/supported-platforms
+1. Flutter — Supported platforms: https://docs.flutter.dev/reference/supported-platforms
 
-2. Flutter — Architecture:  
-   https://docs.flutter.dev/app-architecture
+2. Flutter — Architecture: https://docs.flutter.dev/app-architecture
 
-3. Supabase — Pricing / Free plan:  
-   https://supabase.com/pricing
+3. Supabase — Pricing / Free plan: https://supabase.com/pricing
 
-4. Supabase — Documentation:  
-   https://supabase.com/docs
+4. Supabase — Documentation: https://supabase.com/docs
 
-5. Supabase — Row Level Security / authorization:  
-   https://supabase.com/docs/guides/database/postgres/row-level-security
+5. Supabase — Row Level Security: https://supabase.com/docs/guides/database/postgres/row-level-security
 
-6. Bhashini.ai — API pricing:  
-   https://www.bhashini.ai/pricing
+6. AI4Bharat IndicConformer — 22-language ASR, MIT license: https://huggingface.co/ai4bharat/indic-conformer-600m-multilingual
 
-7. AI4Bharat IndicConformer:  
-   https://huggingface.co/ai4bharat/indic-conformer-600m-multilingual
+7. Bhashini.ai — API pricing: https://www.bhashini.ai/pricing
 
-8. ONDC — Seller Network Participants:  
-   https://www.ondc.org/pages/seller-network-participants.html
+8. ONDC — Seller Network Participants: https://www.ondc.org/pages/seller-network-participants.html
 
-9. ONDC — Ecosystem Participants:  
-   https://www.ondc.org/pages/ecosystem-participants.html
+9. ONDC — Technical resources / staging and reference seller app: https://www.ondc.org/pages/resources-tech.html
 
-10. Cloudflare Workers — Limits:  
-    https://developers.cloudflare.com/workers/platform/limits/
+10. ONDC — Seller App SDK: https://github.com/ONDC-Official/seller-app-sdk
 
-11. Cloudflare Workers — Pricing:  
-    https://developers.cloudflare.com/workers/platform/pricing/
+11. ONDC — Protocol/log validation examples: https://github.com/ONDC-Official/log-validation-utility
 
-12. Ollama:  
-    https://ollama.com/
+12. Cloudflare Workers — Limits: https://developers.cloudflare.com/workers/platform/limits/
 
-13. Qwen:  
-    https://huggingface.co/Qwen
+13. Cloudflare Workers — Pricing: https://developers.cloudflare.com/workers/platform/pricing/
 
 > **External provider capabilities, current API versions, quotas, pricing, licensing, availability, participation requirements and production eligibility must be re-checked immediately before implementation. This architecture intentionally treats those as replaceable integration details rather than immutable assumptions.**
