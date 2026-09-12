@@ -8,68 +8,68 @@
 
 ### Part 1: WHO are we building for?
 
-**PS says:** `marginalized communities, micro-entrepreneurs, artisans, weavers`
-**Real meaning:** Low-income, often rural, 40-60 yr old, shared low-end Android phone, Hindi/regional mother tongue, uses WhatsApp/YouTube(not the majority) but never Amazon Seller, fears English forms.
+****PS Fact**:** `marginalized communities, micro-entrepreneurs, artisans, weavers`
+****Design Assumption**:** Low-income, often rural, 40–60 yr old (assumed age group based on PS context; requires validation), shared low-end Android phone, Hindi/regional mother tongue, uses WhatsApp/YouTube (assumed familiarity; requires validation)(not the majority) but never Amazon Seller, fears English forms.
 **Analysis:** The target user is not just "digitally illiterate" but "digitally anxious". They trust voice and visual cues over text.
-**What we must solve:** If SHE can't use it without help, we failed.
+****Proposed Mechanism**:** If SHE can't use it without help, we failed.
 
 ### Part 2: WHAT is the current system & why it fails?
 
-**PS says:** `Govt gives financial help + Melas like Shilp Samagam, Surajkund, Dilli Haat`
-**Real meaning:** Artisans get temporary 5-10 day sales spike, then 355 days no income. Melas cost govt lakhs, but not sustainable. They have products, but no shop for rest of year.
+****PS Fact**:** `Govt gives financial help + Melas like Shilp Samagam, Surajkund, Dilli Haat`
+****Design Assumption**:** Artisans get temporary 5-10 day sales spike, then 355 days of limited income (implied by PS; requires quantification). Melas cost govt lakhs, but not sustainable. They have products, but no shop for rest of year.
 **Analysis:** The "Mela Model" is an event-based economy. We need to transition this to a "Digital Storefront" economy.
-**What we must solve:** Give them a 365-day shop that works after mela ends.
+****Proposed Mechanism**:** Give them a 365-day shop that works after mela ends.
 
 ### Part 3: WHY can't they sell online today? (4 Barriers)
 
-**PS says:** `low digital literacy, language barriers, lack of technical skills to photograph, price, catalog`
+****PS Fact**:** `low digital literacy, language barriers, lack of technical skills to photograph, price, catalog`
 **Breakdown:**
 
 - **Barrier A - Literacy:** Can't fill 15-field Amazon form.
 - **Barrier B - Language:** Can't type English description, doesn't know SEO.
 - **Barrier C - Skills:** Photos are dark/cluttered, pricing is guesswork.
 - **Barrier D - Hardware:** Some don't even own a smart phone or have stable 4G.
-  **What we must solve:** Remove typing, remove English, remove photo/price expertise. Automate all 3.
+  ****Proposed Mechanism**:** Remove typing, remove English, remove photo/price expertise. Automate all 3.
 
 ### Part 4: WHAT is the BIG ASK? (Virtual Business Manager)
 
-**PS says:** `build intuitive AI-driven mobile app that acts as 'virtual business manager'`
-**Real meaning:** Not just a listing tool. It should do what a shop manager does: Click photo, write board, set price, talk to buyer, take order, pack slip.
+****PS Fact**:** `build intuitive AI-driven mobile app that acts as 'virtual business manager'`
+****Design Assumption**:** Not just a listing tool. It should do what a shop manager does: Click photo, write board, set price, talk to buyer, take order, pack slip.
 **Analysis:** The AI shouldn't just be a feature; it should be the _interface_. The artisan speaks/clicks; the AI manages the "corporate" side of the business.
-**What we must solve:** One app = Inventory + Orders + Buyers, not just catalog.
+****Proposed Mechanism**:** One app = Inventory + Orders + Buyers, not just catalog.
 
 ### Part 5: FEATURE 1 — AI Image Enhancer & Studio
 
-**PS says:** `auto-remove cluttered backgrounds, correct lighting, format to e-commerce standards`
-**Real meaning:** Photo should look like Amazon white-background, even if taken on mud floor in low light.
+****PS Fact**:** `auto-remove cluttered backgrounds, correct lighting, format to e-commerce standards`
+****Design Assumption**:** Photo should look like Amazon white-background, even if taken on mud floor in low light.
 **Technical Path:** Use Segment Anything Model (SAM) or similar for BG removal + AI Relighting for consistent studio-quality look.
-**Brainstorm seed:** Voice-guided capture ("thoda ujale me jao") + offline BG remove + auto-crop to 1:1.
+****Implementation Note**:** Voice-guided capture ("thoda ujale me jao") + offline BG remove + auto-crop to 1:1.
 
 ### Part 6: FEATURE 2 — Multilingual Auto-Cataloger
 
-**PS says:** `describe via voice notes in regional languages → translate & generate SEO-friendly descriptions in English/Hindi`
-**Real meaning:** Speak 10 sec in Bhojpuri → Get professional title+desc+tags in Hindi+English that ranks on search.
+****PS Fact**:** `describe via voice notes in regional languages → translate & generate SEO-friendly descriptions in English/Hindi`
+****Design Assumption**:** Speak 10 sec in Bhojpuri → Get professional title+desc+tags in Hindi+English that ranks on search.
 **Technical Path:** Bhashini STT (Govt of India) → LLM (GPT-4o/Claude) for structured extraction → SEO Template → Multilingual Output.
-**Brainstorm seed:** Voice -> Bhashini STT -> Extract {material, craft, time} -> Template + Light LLM -> Hindi+English + Audio read-back.
+****Implementation Note**:** Voice -> Bhashini STT -> Extract {material, craft, time} -> Template + Light LLM -> Hindi+English + Audio read-back.
 
 ### Part 7: FEATURE 3 — Dynamic Pricing Assistant
 
-**PS says:** `analyze image+description → suggest optimal competitive price based on market trends & raw material costs`
-**Real meaning:** Artisan says "kapda 500 ka, 2 din lage" + AI sees image -> says "Rs. 1650 becho, bazaar me 1800 hai".
+****PS Fact**:** `analyze image+description → suggest optimal competitive price based on market trends & raw material costs`
+****Design Assumption**:** Artisan says "kapda 500 ka, 2 din lage" + AI sees image -> says "Rs. 1650 becho, bazaar me 1800 hai".
 **Technical Path:** Scrape data from GeM/ONDC/Etsy for "similar items" + Cost-Plus pricing model (Material + Labor hours \* Rate).
-**Brainstorm seed:** Cost-plus (labour+material) + Market anchor (avg price scraped weekly) = Suggested price with 3 options + voice reason.
+****Implementation Note**:** Cost-plus (labour+material) + Market anchor (avg price scraped weekly) = Suggested price with 3 options + voice reason.
 
 ### Part 8: HOW should it be built? (Non-functional)
 
-**PS says:** `cross-platform, robust scalable backend, highly responsive minimalist UI/UX, modern clean visual hierarchy`
-**Real meaning:** Must run on cheap Android + iPhone with one codebase, handle 1 lakh users during mela, and be so simple that text is replaced by icons & voice.
-**Brainstorm seed:** Flutter Lite (12MB) + Offline-first + Serverless backend + 3-tap flow + Every text has 🔊.
+****PS Fact**:** `cross-platform, robust scalable backend, highly responsive minimalist UI/UX, modern clean visual hierarchy`
+****Design Assumption**:** Must run on cheap Android + iPhone with one codebase, handle Potential for high user traffic during peak periods (e.g., post-mela; requires capacity planning), and be so simple that text is replaced by icons & voice.
+****Implementation Note**:** Flutter Lite (12MB) + Offline-first + Serverless backend + 3-tap flow + Every text has 🔊.
 
 ### Part 9: WHAT is success?
 
-**PS says:** `year-round sales, lower barrier, improve literacy & financial independence, increase annual income`
-**Real meaning:** Govt will measure: Avg income up? Daily active sellers? Time to first sale?
-**What we must solve:** Build + Measure dashboard for MoSJE.
+****PS Fact**:** `year-round sales, lower barrier, improve literacy & financial independence, increase annual income`
+****Design Assumption**:** Govt will measure: Avg income up? Daily active sellers? Time to first sale?
+****Proposed Mechanism**:** Build + Measure dashboard for MoSJE.
 
 ---
 
@@ -146,7 +146,7 @@ START (Home Screen)
   | Shows: Market Rate | Your Cost | Suggested Price (with voice explain)
   v
 [One Tap: Becho] → Creates:
-  1. WhatsApp Storefront Link (instant sales, no KYC) ← Solves Part 2 (Year-round)
+  1. WhatsApp Storefront Link (same-day storefront activation (KYC-free via WhatsApp), no KYC) ← Solves Part 2 (Year-round)
   2. Queued for ONDC/GeM (when KYC ready)
   3. Inventory + Order manager opens ← Solves Part 4 (Business Manager)
 ```

@@ -1,244 +1,299 @@
-# ShilpSathi — Viable Solution for PS 26090
-### AI-Driven Market Linkage & Smart Cataloging for Marginalized Artisans | MoSJE
+# SOLUTION_26090.md
 
-> **Core Idea:** Don't build AI that *replaces* artisans. Build AI that *removes the photo-typing-pricing burden* in under 60 seconds, on a Rs. 7000 phone, without internet.
+## 1. Solution Overview
 
----
+**Solution Name**: <co>AI Business Manager for Marginalized Artisans
+**One-Line Description**: <co>An AI-driven mobile app that empowers low-digital-literacy artisans to manage digital commerce through voice and visual interactions.
 
-## 1. Why Most Solutions Are NOT Viable (And Ours Is)
+**Fundamental Problem**: <co>Marginalized artisans lack tools to transition from event-based physical markets to continuous digital commerce due to literacy, language, and technical barriers.
 
-| Common SIH Mistake | Why It Fails in Field | ShilpSathi Viable Fix |
-|---|---|---|
-| `GPT-4 + remove.bg API` for every product | Rs. 4-5 per product, needs internet, fails in village, recurring cost unsustainable for govt | **On-device + Govt-funded free APIs (Bhashini) + Self-hosted open models.** Cost ~ Rs. 0.08/product |
-| ONDC/GeM direct integration Day 1 | ONDC seller onboarding needs GST, PAN, KYC — 90% artisans don't have it | **Phased linkage:** Phase 1 = Internal Marketplace + WhatsApp Storefront (no KYC). Phase 2 = Assisted GeM/ONDC via Cluster Coordinator |
-| Heavy ML Pricing Model | No labeled pricing data for 500+ crafts exists | **Hybrid Rule-Based (Cost+) + Market Reference Table.** ML only after 10k transactions collected |
-| English-first App with Translation | Translation is poor for craft terms (e.g. "Tussar", "Zari") | **Voice-First, Template-First catalog.** No typing, no translation errors |
-| Flutter App 50MB+ | Won't install on 16GB phones, no updates | **Lite APK 12MB + PWA fallback + Offline Sync** |
+**Core Philosophy**: <co>The artisan should not have to learn e-commerce; the system should translate natural actions into commerce operations.
 
-**Viability Definition for MoSJE:** Works for a 45-year-old Bhojpuri-speaking weaver in Bhagalpur with Redmi 9A, 1GB data/month, intermittent 2G.
+**Differentiator**: <co>Combines AI automation with human-in-the-loop assistance and offline resilience, creating year-round market access without requiring advanced digital skills.
 
 ---
 
-## 2. Viability Constraints — We Designed For These
+## 2. Problem → Solution Mapping
 
-1.  **Device:** Android 8+, 2GB RAM, 16GB storage. No iPhone assumption.
-2.  **Network:** 60% offline. 2G in clusters. Upload must work on 50kbps.
-3.  **Language:** 22 official languages + dialects. Roman typing not viable.
-4.  **Trust:** Artisans fear online fraud. Need human (CRP/SHG Didi) in loop.
-5.  **Economics:** Artisan can't pay subscription. Govt can't pay OpenAI bills forever.
-
----
-
-## 3. Architecture — Viable & Low Cost
-
-```
-[Artisan Phone]                          [Cluster / Cloud when online]
-┌─────────────────────────┐              ┌──────────────────────────┐
-│ Flutter Lite App (12MB) │              │ Backend: FastAPI + Node │
-│ ├ SQLite (Offline DB)   │◄── Sync ────►│ ├ Bhashini/STT Proxy    │
-│ ├ On-Device AI (TFLite) │  WorkManager │ ├ Catalog Service       │
-│ │  • BG Remove (U2Net)  │  (bg sync)   │ ├ Pricing Engine        │
-│ │  • Blur Check         │              │ └ ONDC/GeM Connector    │
-│ └ Voice UI (Bhashini)   │              │                         │
-└─────────────────────────┘              │ Postgres + S3 (MeitY Cloud) │
-        │ WhatsApp Share Link            └──────────────────────────┘
-        └──────────► Buyer (No App Needed)
-```
-
-**Hosting:** MeitY Empanelled Cloud (NIC/MeghRaj) or AWS Mumbai (data residency). Auto-scale OFF — we use Serverless (Cloud Run) to keep cost low when idle.
+| **Problem**                          | **Why It Exists**                             | **Our Response**                     |
+| ------------------------------------ | --------------------------------------------- | ------------------------------------ |
+| <co>Low digital literacy             | <co>Conventional commerce requires complex steps | <co>Voice-first AI interface         |
+| <co>Language barrier                 | <co>English/text-heavy workflows              | <co>Regional voice + multilingual AI |
+| <co>Poor product photography         | <co>Limited photography skills                | <co>AI Image Studio                  |
+| <co>Difficult cataloging             | <co>Complex product metadata/descriptions     | <co>AI Auto-Cataloger               |
+| <co>Poor pricing knowledge           | <co>Lack of market information                 | <co>AI Price Advisor                |
+| <co>Limited year-round market access | <co>Dependence on physical fairs               | <co>Market Access Engine                  |
+| <co>Difficult business management    | <co>Complex orders/inventory                    | <co>AI Business Manager              |
+| <co>Adoption/training barrier        | <co>User may need assistance                   | <co>Didi/CRP Mode                         |
 
 ---
 
-## 4. Feature 1: AI Image Studio — Viable Implementation
+## 3. Target Users
 
-**What Artisan Does:** Place product on floor -> Tap `Photo Lo` -> App says "Rukiye, photo saaf kar rahe hain"
+### 3.1 Primary User
+**Low-Digital-Literacy Artisan**: 
+- **Environment**: <co>Rural/semi-urban, shared low-end Android phone, intermittent 4G.
+- **Digital Limitations**: <co>Avoids English, prefers voice/visual over text, trusts WhatsApp.
+- **Current Workflow**: <co>Relies on physical fairs; no digital catalog or pricing strategy.
+- **Capabilities**: <co>Can use microphone/camera, follow visual cues, confirm yes/no.
 
-**Viable Pipeline (No Paid API):**
-1.  **On-Phone (Instant, Offline):** `TFLite U2Net` (2.1MB model) removes background -> checks blur/lighting -> auto-crops to 1:1. Takes <2 sec on 2GB RAM.
-2.  **If Online (Enhanced):** Sends 80KB compressed image to Server -> `BiRefNet` (open-source, self-hosted) does high-quality cutout + `Real-ESRGAN-light` sharpens + adds white background + shadow.
-3.  **Fallback:** If AI fails, offer 3 background choices as static images (White, Jute Texture, Lifestyle). No generation needed.
+### 3.2 Secondary Users
+- **CRP/Didi**: <co>Facilitates onboarding, assists first listings.
+- **B2B Buyers**: <co>Hotels, NGOs seeking bulk handicrafts.
+- **Institutions**: <co>Government programs (e.g., MoSJE) needing procurement channels.
 
-**Why Viable:** No per-image cost. Works offline. We don't promise "studio lifestyle mockup generation" (needs Stable Diffusion, heavy). We promise "GeM-compliant white background" — which is what actually sells.
-
-**Output:** 4 images auto-created: 1) Main White BG 2) Zoom 3) Lifestyle Template 4) Size Reference. All <200KB.
-
----
-
-## 5. Feature 2: Multilingual Auto-Cataloger — Viable Implementation
-
-**What Artisan Does:** Hold mic -> Speak 10 sec: *"Ye Bhagalpuri Tussar saree hai, haath se bani hai, teen din lagte hain"*
-
-**Viable Pipeline (Govt Stack):**
-```
-Voice → Bhashini ASR (Free, supports 22 langs) → Text (Bhojpuri/Hindi)
-Text → Entity Extractor (Small LLM/Sarvam AI - Hosted) → JSON {craft, material, time}
-JSON → Template Engine → Title + Description (Hindi + English)
-```
-
-**We DO NOT use GPT-4 for every description.** We use:
-
-*   **80% Template-Based:** 50 curated templates by craft type. E.g. Tussar Saree Template: `"Handmade {craft} {product} in Pure {material} | {region} Traditional Art | {USP} | Ideal for {occasion}"` — Filled by extracted entities. Zero hallucination, SEO perfect, runs offline.
-*   **20% LLM Polishing:** Only if artisan wants "story" — then one call to `Sarvam-M` (Indian LLM, cheap, hosted) or `Llama-3-8B` self-hosted. Cost Rs. 0.02 vs Rs. 1.5 for GPT-4.
-
-**Bhashini > Whisper:** Because Bhashini is free for MoSJE projects and trained on Indian dialects. Whisper fails on Maithili/Bhojpuri.
-
-**What Gets Generated:**
-*   Title (Hindi + English)
-*   Description 80-120 words
-*   Auto-attributes: Material, Craft, Color (from image classifier MobileNetV3 1MB), Size
-*   Hashtags + Search Keywords
-*   **Voice Output:** Bhashini TTS reads back description to artisan for confirmation — she can say "Haan" or "Badlo"
-
-**Editable by Voice:** *"Price wala line hata do"* -> Intent detected -> Removed.
+### 3.3 User Assumptions vs. Confirmed Facts
+- **PS Facts**: 
+  - <co>Target population: marginalized artisans/weavers.
+  - <co>Barriers: literacy, language, photography, pricing, cataloging.
+  - <co>Need: year-round digital sales.
+- **Design Assumptions**: 
+  - <co>40–60 yr age group (implied; requires validation).
+  - <co>WhatsApp familiarity (assumed; requires validation).
+  - <co>355 days of limited income between fairs (implied by PS).
+- **Validation Needed**: 
+  - <co>Demographics, tech usage, income patterns.
+  - <co>ONDC buyer app reach and transaction volumes.
 
 ---
 
-## 6. Feature 3: Dynamic Pricing Assistant — Viable Implementation
+## 4. Core Solution Concept
 
-**Reality Check:** True ML pricing needs 50k+ sales data which doesn't exist. So we build VIABLE Hybrid:
+**AI-Native Business Manager**: <co>Translates natural artisan actions (voice/visual) into digital commerce operations.
 
-**Step 1 (Day 1, No ML): Cost-Plus + Market Anchor**
-
-```
-Artisan says: "Kapda 600 ka, 3 din lage"
-→ LLM extracts: cost=600, labour_days=3
-→ Labour Rate = Rs. 350/day (state-wise config)
-→ Base Cost = 600 + (3*350) = 1650
-→ Market Anchor = Avg price of "Tussar Saree" from 3 sources (scraped weekly via cron: Amazon, GeM, ONDC) = e.g. 2200
-→ Suggested Price = (Base Cost * 1.15 profit) clamped between Anchor ±20% = Rs. 1897 → Show as Rs. 1890
-```
-
-**UI Shows Breakdown in Voice + Visual:**
-```
-Market me daam: Rs. 2000-2400
-Aapki lagat: Rs. 1650
-Munafa (15%): Rs. 247
->> Suggested: Rs. 1890 [Becho] 
-[ Kam Rs. 1750 ] [ Zyada Rs. 2100 ]
-```
-Artisan chooses. We never force.
-
-**Step 2 (After 3 months data):** Train simple `XGBoost` on our own sales: Features = craft, material, cost, market anchor -> Target = sold price. This is viable because data comes from our app, not scraped.
-
-**Why Viable:** Explainable, trustable, works Day 1 without training data, no black-box.
+### 5-Layer Architecture
+1. **Create**: <co>Voice + Camera input.
+2. **Prepare**: <co>AI enhances images, generates multilingual catalogs, advises pricing.
+3. **Sell**: <co>Market Access Engine connects to B2C, B2B, and government channels.
+4. **Operate**: <co>Business Manager tracks inventory, orders, fulfillment.
+5. **Assist**: <co>Voice AI, Didi/CRP support, offline resilience.
 
 ---
 
-## 7. Market Linkage — Viable Phased Plan
+## 5. End-to-End Artisan Journey
 
-**Phase 1 (SIH Demo + Pilot 0-6 Months): No KYC Headache**
-*   **Internal Marketplace + WhatsApp Store:** Every artisan gets `shilpsathi.in/rani` link. Buyer (even without app) can view, chat on WhatsApp, order via COD. Zero ONDC/GST needed. This alone solves "year-round channel".
-*   **Assisted B2B:** B2B Buyers app/portal where they post bulk demand: "Need 500 Tussar Sarees". Cluster Coordinator matches artisans. Trust layer = human.
+### 5.1 Start
+<co>Artisan opens app, selects language via voice.
 
-**Phase 2 (6-12 Months): Assisted ONDC/GeM**
-*   Artisan with Udyam/GST -> One-tap publish to ONDC via Seller App (like Mystore). We don't build ONDC protocol; we integrate via `ONDC Gateway Sandbox` as Seller.
-*   For others: Products pooled under `Cluster ID` (e.g., Bhagalpur Handloom Cluster) which has GST, managed by NGO. Artisan gets credited. This is how GeM actually works for artisans today — we digitize it.
+### 5.2 Create Product
+<co>Takes photo → speaks product description (e.g., "Ye Tussar saree hai").
 
-**Logistics Viable:** No own fleet. Integrate `India Post` (has village reach, govt tie-up easy) + `Shiprocket` API. COD via India Post. UPI via `e-RUPI`/`UPI Autopay`. Order alert via SMS if no internet.
+### 5.3 AI Understands
+<co>AI extracts details: material, craft type, production time.
 
----
+### 5.4 AI Prepares
+- <co>Image enhanced (background removed, lighting corrected).
+- <co>Catalog generated in Hindi/English with SEO tags..
+- <co>Price advised: cost floor + market range + suggested price.
 
-## 8. Viable Tech Stack with Cost
+### 5.5 Artisan Confirms
+<co>AI proposes details via voice/visual; artisan confirms or edits.
 
-| Layer | Choice | Viable Reason | Cost |
-|---|---|---|---|
-| **App** | Flutter + SQLite + WorkManager | 1 codebase, 12MB, offline queue, runs on Android 8 | Free |
-| **On-Device AI** | TFLite U2Net + MobileNetV3 | 3MB total, offline, no server cost | Free |
-| **Speech** | Bhashini ASR/TTS + Sarvam AI | Free for govt, 22 langs, better than Google for dialects | Rs. 0 |
-| **Backend AI** | Self-hosted Llama-3-8B + BiRefNet on Cloud Run (CPU) | No OpenAI bill. Scales to 0 when idle | ~Rs. 3000/mo |
-| **Backend** | Python FastAPI + Postgres + S3 | All open source, MeitY compliant | ~Rs. 2500/mo (NIC) |
-| **Search** | Postgres Full-Text (no Pinecone) | Works for 1L products, no vector DB cost initially | Free |
-| **Auth** | OTP via Fast2SMS (Rs. 0.10/SMS) | No password, works on feature phones | Pay per use |
+### 5.6 Publish
+<co>Product listed on WhatsApp storefront and queued for ONDC/GeM (post-KYC).
 
-**Total Infra for 10,000 artisans: ~Rs. 6000-8000/month.** Viable for MoSJE to sustain.
+### 5.7 Receive & Manage Orders
+<co>Orders appear in simplified dashboard; fulfillment steps guided via voice.
 
----
-
-## 9. Offline-First & Low-End Strategy
-
-*   List product fully offline (photo+voice stored locally). Syncs when WhatsApp opens (user has net).
-*   Images: Auto-compress to 80KB (WebP) for 2G upload. Server reconstructs high-res.
-*   **PWA Fallback:** If artisan can't install APK, open `app.shilpsathi.in` in Chrome — works 90% same.
-*   **IVR Helpline:** For no-smartphone artisans: Call toll-free, speak product details -> CRP lists on their behalf (human-in-loop).
+### 5.8 Fulfil & Track Earnings
+<co>Artisan sees next action (e.g., "Pack for shipment") and earnings balance.
 
 ---
 
-## 10. Onboarding — How We Get 1000 Artisans in 3 Months (Viable GTM)
+## 6. Product Capabilities
 
-Tech alone fails. We piggyback on existing structure:
+### 6.1 AI Image Studio
+- **Purpose**: <co>Professional e-commerce photos.
+- **Input**: <co>Smartphone photo.
+- **Processing**: <co>Background removal, lighting correction, auto-crop.
+- **Output**: <co>White-background product image.
+- **Safeguards**: <co>Original vs. enhanced comparison; prohibits structural changes.
 
-1.  **Via Cluster Resource Persons (CRPs) & SHG Didis:** Train 1 CRP per 50 artisans (already employed by MoSJE). CRP has "Master App" to bulk onboard via Aadhaar OTP, does first 3 listings with artisan. Artisan learns by seeing.
-2.  **Demo at Shilp Samagam Melas:** Set up stall: "60 sec me apna saman online karo". Instant WhatsApp link = wow moment.
-3.  **Incentive:** First 3 orders zero commission. MoSJE can give Rs. 500 digital onboarding incentive via DBT (existing scheme).
+### 6.2 Multilingual Auto-Cataloger
+- **Workflow**: <co>Voice → STT → LLM extraction → template → multilingual output.
+- **Languages**: <co>Hindi/English + 22 regional languages (via Bhashini).
+- **Confirmation**: <co>Artisan verifies AI-generated description.
 
-**Material:** 2-min video in Maithili/Bhojpuri with local artisan hero, not Hindi explainer.
+### 6.3 AI Price Advisor
+- **Inputs**: <co>Material cost, labor hours, market data (GeM/ONDC/Etsy).
+- **Output**: <co>Cost floor, market range, suggested price with confidence score.
+- **Explanation**: <co>Voice/visual breakdown of cost vs. market value.
 
----
+### 6.4 AI Voice Interface
+**Stack**: <co>Speech Input → Language Detection → STT → Intent/Entity Extraction → Action → Multimodal Confirmation → Response.
 
-## 11. What We Will Demo Live at SIH (100% Viable MVP)
+### 6.5 Business Manager
+- **Inventory**: <co>Product variants, stock levels.
+- **Orders**: <co>New → Confirmed → Preparing → Shipped → Delivered.
+- **Fulfillment**: <co>SMS notifications for offline confirmation.
+- **Payments**: <co>Earnings dashboard.
 
-Judges can test on their phone (no mock):
-
-1.  **Photo Studio:** Take photo of pen/bottle -> See background removed offline in 2 sec + GeM crop.
-2.  **Voice Catalog:** Speak in Hindi/Bhojpuri -> See title/description in Hindi+English + auto-tags in 4 sec (via Bhashini + template).
-3.  **Pricing:** Speak cost -> See breakdown + slider + voice justification.
-4.  **WhatsApp Storefront:** Tap Publish -> Get shareable link -> Open on another phone, place COD order -> Artisan gets order notification + SMS.
-
-**All running on real APIs, no hard-coded slides.** Backend on Render/Railway free tier for demo, ready to move to NIC.
-
----
-
-## 12. Business Sustainability
-
-*   **For Artisan:** Free forever. 0 fees till Rs. 50k sales/year. After that 5% commission only on B2B bulk orders (where we added value). No upfront cost.
-*   **For Govt:** Infra cost < 1% of current Mela subsidy per artisan. Dashboard shows ROI: Sales, income uplift.
-*   **Revenue for Scale:** Commission + Logistics margin (Rs. 10/order from Shiprocket) + Premium B2B Buyer subscription (Rs. 999/mo for verified artisan access).
-
----
-
-## 13. Roadmap (Viable Sprints)
-
-| Sprint | Weeks | Shippable |
-|---|---|---|
-| S1 | 1-3 | Flutter app, offline DB, on-device BG remove, Bhashini ASR working |
-| S2 | 4-6 | Template catalog (50 templates), Cost-plus pricing, Shareable storefront |
-| S3 | 7-9 | Server enhancement (BiRefNet), Order + India Post slip, SMS alerts |
-| S4 | 10-12 | B2B Buyer portal, CRP Master App, Field test with 20 artisans in cluster |
-| S5 | Post-SIH | ONDC sandbox + GeM assisted onboarding, Vector search, Income dashboard |
+### 6.6 Market Access Engine
+- **B2C**: <co>Shareable WhatsApp storefronts.
+- **B2B**: <co>Bulk buyer matching with structured quotations.
+- **Government**: <co>GeM readiness assessment.
 
 ---
 
-## 14. Risks & Viable Mitigations
+## 7. Market Linkage & Demand Matching
 
-| Risk | Mitigation |
-|---|---|
-| Bhashini STT fails for heavy dialect | Show transcript back, artisan says "Sahi/Nahi" by voice -> retry or CRP corrects once, system learns |
-| Pricing distrust | Always show 3 options + breakdown, never auto-set price. Add "Padosi bech raha hai Rs. X" social proof |
-| Internet = 0 for days | SMS order alert: "Naya Order #123: 1 Saree Rs. 1890. CALL 1800-... to accept" |
-| Fake/low quality listings | CRP verification queue before public listing (1 tap approve) |
+**Core Distinction**: <co>Active demand creation, not passive digitization.
 
----
-
-## 15. Impact Metrics (MoSJE Will Actually Measure)
-
-*   Time to first listing: **<60 sec** (vs 25 mins on Amazon)
-*   Listings without CRP help: **>80%**
-*   Active sellers with ≥1 sale/month: **Target 60% in 6 months**
-*   Avg income uplift: **+35% Year 1** (track via order value)
-*   Women onboarding: **>50%**
+- **B2C Matching**: <co>Product profiles connected to buyer search patterns.
+- **B2B Matching**: <co>Buyer requirements (quantity/budget) matched to artisan capacity.
+- **Government Channel**: <co>Guided onboarding for GeM compliance.
 
 ---
 
-## 16. Conclusion — Viability Statement
+## 8. Trust, Safety & Human-in-the-Loop
 
-**ShilpSathi is viable because:**
-1.  Costs Rs. 0 to artisan, <Rs. 1 to govt per product
-2.  Works offline, on cheapest phone, in artisan's dialect
-3.  Uses government-free stack (Bhashini, India Post, NIC Cloud)
-4.  Solves Year-Round sales Day 1 via WhatsApp (no ONDC wait)
-5.  Builds trust via human CRP + explainable pricing
-
-> **Jury One-Liner:** *Bol kar becho, WhatsApp pe becho — no English, no typing, no internet needed.*
+- **AI Proposes, Human Confirms**: <co>Every critical action requires artisan verification.
+- **Multimodal Confirmation**: <co>Voice + visual cues reduce ambiguity.
+- **Image Authenticity**: <co>Original/enhanced side-by-side.
+- **Trust Signals**: <co>Artisan verification, craft region, production story.
+- **Human Escalation**: <co>Didi/CRP assistance for complex issues.
 
 ---
-*Ready to Build Stack: Flutter, FastAPI, Postgres, TFLite, Bhashini, BiRefNet, Shiprocket | Repo: /app | Demo APK: Lite 12MB*
+
+## 9. UX Philosophy: Radical Simplification
+
+### Primary Navigation
+- **Sell**: Create new products.
+- **My Orders**: Manage fulfillment.
+- **My Money**: Track earnings.
+
+### Design Principles
+- <co>Progressive disclosure: Advanced features hidden until needed.
+- <co>Voice-first, not voice-only: Visual cues support voice interactions.
+- <co>Accessibility: Large icons, audio feedback, minimal text.
+
+### Validation Metrics
+- <co>Time to first product creation.
+- <co>Task completion rate without assistance.
+- <co>Error correction rate.
+
+---
+
+## 10. Assisted & Offline Experience
+
+### 10.1 Didi/CRP Mode
+- <co>Onboard 10+ artisans per cluster.
+- <co>Assist first 3 listings per artisan.
+- <co>Track artisan independence via usage metrics.
+
+### 10.2 Offline Resilience
+- **Offline Product Creation**: <co>Drafts saved locally, synced when online.
+- **SMS Fallback**: <co>Order confirmations via structured SMS.
+- **Clear Connectivity Status**: <co>No ambiguous "waiting" states.
+
+---
+
+## 11. Verification & Market Readiness
+
+### 4-Stage Assessment
+1. **Stage 0**: <co>Product created (basic listing).
+2. **Stage 1**: <co>Basic selling ready (WhatsApp storefront).
+3. **Stage 2**: <co>ONDC-ready (catalog compliance, logistics).
+4. **Stage 3**: <co>B2B-ready (bulk capacity, invoicing).
+5. **Stage 4**: <co>GeM-ready (PAN, certifications).
+
+**Artisan Feedback**: <co>Plain-language status (e.g., "Aapka product ONDC ke liye ready hai").
+
+---
+
+## 12. MVP Definition
+
+### SIH MVP (6 Months)
+**Included**:
+- <co>Flutter mobile app.
+- <co>In-app Voice AI (STT, LLM, TTS).
+- <co>AI Image Studio.
+- <co>Multilingual catalog generation..
+- <co>Price Advisor.
+- <co>Inventory/Order management.
+- <co>WhatsApp storefront integration.
+- <co>Didi/CRP Mode.
+
+**Demonstrates**: <co>End-to-end flow from voice input to digital sale without KYC.
+
+**Explicit Exclusions**:
+- <co>Phone-call interface (Phase 3).
+- <co>Full ONDC/GeM production integration (Phase 2).
+- <co>B2B operational coordination (Phase 4).
+
+---
+
+## 13. Future Roadmap
+
+- **Phase 2**: <co>ONDC sandbox integration + advanced Didi tools.
+- **Phase 3**: <co>Zero-UI Voice Agent for non-smartphone users.
+- **Phase 4**: <co>B2B matching engine + visual discovery + GeM workflows.
+
+---
+
+## 14. Differentiation
+
+| **Platform**          | **Assumes**                                | **Solves**                          | **Leaves to Artisan**                  | **Our Solution Removes**                  |
+| ---------------------- | ------------------------------------------ | ----------------------------------- | --------------------------------------- | ----------------------------------------- |
+| **GeM**                | <co>GST, KYC, professional cataloging | <co>B2G access                      | <co>Complex registration               | <co>Cataloging/pricing barriers |
+| **ONDC Seller Apps**   | <co>Digital literacy, existing catalog | <co>Marketplace access              | <co>Catalog formatting, compliance     | <co>Onboarding complexity              |
+| **Amazon/Etsy**        | <co>English, photography, pricing skills | <co>Global B2C reach                | <co>SEO, competitive pricing       | <co>Language/skill barriers       |
+| **Conventional Apps**  | <co>Smartphone, data, literacy           | <co>Basic e-commerce                  | <co>Everything (photos, desc, price) | <co>All complexity via AI automation |
+
+---
+
+## 15. Impact & Success Metrics
+
+| **Category**      | **Metrics**                                                                 |
+| ------------------ | --------------------------------------------------------------------------- |
+| **Accessibility**  | <co>Time to first listing, assistance required, task completion rate. |
+| **Commerce**       | <co>Listings/day, inquiry-to-order rate, repeat sales.                     |
+| **Economic**       | <co>Digital sales volume, net artisan earnings, income growth.       |
+| **Independence**   | <co>Assisted → independent seller progression.                              |
+
+---
+
+## 16. Deployment Model
+
+- **Government/Institutional Deployment**: <co>Subsidized onboarding via Didi Mode.
+- **Artisan Adoption**: <co>Zero direct cost; monetization via transaction fees (≤2%) on successful sales.
+
+---
+
+## 17. Solution Boundaries & Assumptions
+
+### We Assume
+- <co>ONDC/GeM APIs remain stable and accessible.
+- <co>Bhashini/LLM providers maintain regional language accuracy.
+- <co>Artisans have basic smartphone access (even low-end).
+
+### We Do Not Claim
+- <co>AI pricing is "optimal" (provides transparent advisory only).
+- <co>ONDC integration guarantees buyer app access (enables readiness).
+- <co>Visual search solves all discovery needs (roadmap item).
+
+### We Depend On
+- <co>Government partnerships for Didi Mode deployment.
+- <co>Stable internet for cloud AI processing (offline fallback for core actions).
+
+---
+
+## 18. One-Page Summary
+
+**Problem**: <co>Marginalized artisans lack digital skills/tools for year-round commerce.
+
+↓
+
+**AI Business Manager**: <co>Voice/visual interface automates cataloging, pricing, and market access.
+
+↓
+
+**Create → Prepare → Sell → Operate**: <co>Natural actions become digital operations.
+
+↓
+
+**Assist Layer**: <co>Didi support, offline resilience, multimodal confirmation.
+
+↓
+
+**Outcome**: <co>Continuous digital market participation, increased income, preserved heritage.
